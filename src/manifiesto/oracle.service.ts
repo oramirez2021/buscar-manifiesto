@@ -24,26 +24,30 @@ export class OracleService {
     if (this.oracleInitialized) return;
     
     try {
-      // Configurar variables de entorno automáticamente
-      process.env.ORACLE_HOME = '/home/omar/oracle/instantclient';
-      process.env.LD_LIBRARY_PATH = '/home/omar/oracle/instantclient:' + (process.env.LD_LIBRARY_PATH || '');
+      // Configurar variables de entorno desde configuración
+      const oracleHome = process.env.ORACLE_HOME;
+      const ldLibraryPath = process.env.LD_LIBRARY_PATH;
+      
+      if (!oracleHome) {
+        throw new Error('ORACLE_HOME environment variable is not set');
+      }
       
       this.logger.log('🔧 Configuring Oracle environment variables:');
-      this.logger.log(`  ORACLE_HOME: ${process.env.ORACLE_HOME}`);
-      this.logger.log(`  LD_LIBRARY_PATH: ${process.env.LD_LIBRARY_PATH}`);
+      this.logger.log(`  ORACLE_HOME: ${oracleHome}`);
+      this.logger.log(`  LD_LIBRARY_PATH: ${ldLibraryPath || 'not set'}`);
       
       // Verificar que las librerías existen
       const fs = require('fs');
-      const libPath = '/home/omar/oracle/instantclient/libnnz21.so';
+      const libPath = `${oracleHome}/libnnz21.so`;
       if (!fs.existsSync(libPath)) {
-        throw new Error(`Oracle library not found at ${libPath}`);
+        throw new Error(`Oracle library not found at ${libPath}. Please ensure Oracle Instant Client is properly installed.`);
       }
       this.logger.log('✅ Oracle libraries found');
       
       // Forzar modo Thick con configuración completa
       oracledb.initOracleClient({ 
-        libDir: '/home/omar/oracle/instantclient',
-        configDir: '/home/omar/oracle/instantclient'
+        libDir: oracleHome,
+        configDir: oracleHome
       });
       this.oracleInitialized = true;
       this.logger.log('✅ Oracle client initialized in Thick mode during service construction');
@@ -55,12 +59,16 @@ export class OracleService {
         this.logger.error('❌ Failed to initialize Oracle client:', error.message);
         // Intentar de nuevo con configuración mínima
         try {
-          oracledb.initOracleClient({ libDir: '/home/omar/oracle/instantclient' });
+          const oracleHome = process.env.ORACLE_HOME;
+          if (!oracleHome) {
+            throw new Error('ORACLE_HOME environment variable is not set');
+          }
+          oracledb.initOracleClient({ libDir: oracleHome });
           this.oracleInitialized = true;
           this.logger.log('✅ Oracle client initialized with minimal config');
         } catch (retryError) {
           this.logger.error('❌ Failed to initialize Oracle client on retry:', retryError.message);
-          this.logger.error('🔧 Make sure to run: ./start-with-oracle.sh');
+          this.logger.error('🔧 Please ensure Oracle Instant Client is installed and ORACLE_HOME is set');
           throw new Error(`Oracle initialization failed: ${retryError.message}`);
         }
       }
@@ -76,10 +84,21 @@ export class OracleService {
     
     this.logger.log('Creating Oracle connection...');
     
+    // Validar variables de entorno requeridas
+    const dbUsername = process.env.DB_USERNAME;
+    const dbPassword = process.env.DB_PASSWORD;
+    const dbHost = process.env.DB_HOST;
+    const dbPort = process.env.DB_PORT || '1521';
+    const dbName = process.env.DB_NAME;
+
+    if (!dbUsername || !dbPassword || !dbHost || !dbName) {
+      throw new Error('Missing required database environment variables: DB_USERNAME, DB_PASSWORD, DB_HOST, DB_NAME');
+    }
+
     const connection = await oracledb.getConnection({
-      user: process.env.DB_USERNAME || 'UD_ORAMIREZ_ARKHO',
-      password: process.env.DB_PASSWORD || 'pqb1#410',
-      connectString: process.env.DB_HOST ? `${process.env.DB_HOST}:${process.env.DB_PORT || '1521'}/${process.env.DB_NAME || 'aries'}` : '10.19.201.62:1521/aries'
+      user: dbUsername,
+      password: dbPassword,
+      connectString: `${dbHost}:${dbPort}/${dbName}`
     });
     
     this.logger.log('✅ Successfully connected to Oracle database');
