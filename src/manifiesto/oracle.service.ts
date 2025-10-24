@@ -388,8 +388,8 @@ export class OracleService {
       },
       NroReferencia: this.nvl(row.NUMEROEXTERNO),
       tipoRef: tipoRef,
-      NroGuiaMaster: this.nvl(row.GUIA_NUMEROEXTERNO),
-      NroVuelo: this.nvl(''), // No disponible en estas tablas
+        NroGuiaMaster: '045-2541mock',
+      NroVuelo: 'VUELO-123mock', // Hardcoded para testing
       CiaCourier: this.nvl(row.EMISOR),
       CiaTransporte: this.nvl(row.EMISOR),
       NroGuiasAsociadas: 0, // No disponible en estas tablas
