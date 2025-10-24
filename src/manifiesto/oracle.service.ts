@@ -11,6 +11,43 @@ const VISADO_SI = 'SI';
 const NCMP_VISADO = 'NCMP';
 const TODOS_VISADO = 'TODOS';
 
+// Constantes de configuración
+const MAX_ROWS = 1000;
+const MAX_TEST_ROWS = 10;
+const DEFAULT_DATE = '31-12-2003';
+const ORACLE_DATE_FORMAT = 'dd-mm-yyyy';
+
+// Interfaces TypeScript
+interface OracleRow {
+  ID: number;
+  NUMEROEXTERNO: string;
+  EMISOR: string;
+  NUMEROREFERENCIAORIGINAL?: string;
+  FECHACREACION: Date;
+  PUERTOEMBARQUE?: string;
+  PUERTODESEMBARQUE?: string;
+  FECHAACEPTACION: Date;
+  FECHACONFORMADO?: Date;
+  SFECHAACEPTACION?: string;
+  TOTALGUIAS?: number;
+  TOTALPESO?: number;
+  TOTALMONTO?: number;
+  TOTALGUIASMARCADAS?: number;
+  TOTALGUIASMAS30?: number;
+  ESCONFORMADO?: string;
+  ESVISADO?: string;
+  XML?: string;
+  MADREREFERENCIADA?: string;
+  MICREFERENCIADO?: string;
+  CRTREFERENCIADO?: string;
+  VIAJE?: string;
+  // Campos adicionales para compatibilidad
+  GUIA_NUMEROEXTERNO?: string;
+  NUMEROACEPTACION?: string;
+  fechaconformado?: string;
+  esVisado?: string;
+}
+
 @Injectable()
 export class OracleService {
   private readonly logger = new Logger(OracleService.name);
@@ -75,7 +112,7 @@ export class OracleService {
     }
   }
 
-  private async getConnection() {
+  private async getConnection(): Promise<oracledb.Connection> {
     // Verificar que Oracle esté inicializado en modo Thick
     if (!this.oracleInitialized) {
       this.logger.warn('Oracle not initialized, attempting to initialize now...');
@@ -95,15 +132,20 @@ export class OracleService {
       throw new Error('Missing required database environment variables: DB_USERNAME, DB_PASSWORD, DB_HOST, DB_NAME');
     }
 
-    const connection = await oracledb.getConnection({
-      user: dbUsername,
-      password: dbPassword,
-      connectString: `${dbHost}:${dbPort}/${dbName}`
-    });
-    
-    this.logger.log('✅ Successfully connected to Oracle database');
-    this.logger.log(`   - Oracle version: ${connection.oracleServerVersionString}`);
-    return connection;
+    try {
+      const connection = await oracledb.getConnection({
+        user: dbUsername,
+        password: dbPassword,
+        connectString: `${dbHost}:${dbPort}/${dbName}`
+      });
+      
+      this.logger.log('✅ Successfully connected to Oracle database');
+      this.logger.log(`   - Oracle version: ${connection.oracleServerVersionString}`);
+      return connection;
+    } catch (error) {
+      this.logger.error('❌ Failed to connect to Oracle database:', error.message);
+      throw new Error(`Database connection failed: ${error.message}`);
+    }
   }
 
   async consultaMftocGTIME(
@@ -324,13 +366,13 @@ export class OracleService {
       query += ` AND m.IDEMISOR = ${emisor}`;
     }
 
-    query += ` AND ROWNUM <= 1000`;
+    query += ` AND ROWNUM <= ${MAX_ROWS}`;
 
     return query;
   }
 
   private mapConsultaMFTOCDirect(
-    row: any,
+    row: OracleRow,
     estaVisado: string,
     estaConformado: string,
     madrereferenciada: string,
@@ -342,7 +384,7 @@ export class OracleService {
 
     return {
       Oid: {
-        Id: parseInt(row.ID)
+        Id: row.ID
       },
       NroReferencia: this.nvl(row.NUMEROEXTERNO),
       tipoRef: tipoRef,
@@ -382,6 +424,10 @@ export class OracleService {
   }
 
   private convertToOracleDate(dateString: string): string {
+    if (!dateString) {
+      throw new Error('Date string is required');
+    }
+    
     // Asegurar que la fecha esté en formato DD/MM/YYYY
     if (dateString.includes('/')) {
       return dateString; // Ya está en formato correcto
@@ -396,6 +442,23 @@ export class OracleService {
     }
     
     return dateString;
+  }
+
+  private isValidDate(dateString: string): boolean {
+    if (!dateString) return false;
+    
+    // Validar formato DD/MM/YYYY o DD-MM-YYYY
+    const dateRegex = /^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/;
+    const match = dateString.match(dateRegex);
+    
+    if (!match) return false;
+    
+    const [, day, month, year] = match;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    
+    return date.getFullYear() == parseInt(year) &&
+           date.getMonth() == parseInt(month) - 1 &&
+           date.getDate() == parseInt(day);
   }
 
   private formatDateString(date: any): string {
@@ -471,7 +534,7 @@ export class OracleService {
       WHERE m.tipodocumento = 'MFTOC'
         AND m.activo = 'S'
         AND UPPER(m.numeroexterno) LIKE UPPER('%${numeroExterno}%')
-      AND ROWNUM <= 10
+      AND ROWNUM <= ${MAX_TEST_ROWS}
     `;
   }
 
@@ -610,14 +673,21 @@ export class OracleService {
     idEmisor?: number,
     nroGuia?: string
   ) {
+    // Validar parámetros de entrada
+    if (fechaDesde && !this.isValidDate(fechaDesde)) {
+      throw new Error('Invalid fechaDesde format. Expected DD/MM/YYYY or DD-MM-YYYY');
+    }
+    if (fechaHasta && !this.isValidDate(fechaHasta)) {
+      throw new Error('Invalid fechaHasta format. Expected DD/MM/YYYY or DD-MM-YYYY');
+    }
     let connection;
     try {
       this.logger.log('🔍 Ejecutando consulta completa Fisc_ConsultaMFTOC_GTIME equivalente');
       connection = await this.getConnection();
       
-      // Convertir fechas
-      const v_fechadesde = fechaDesde ? `TO_DATE('${fechaDesde}', 'dd-mm-yyyy')` : `TO_DATE('31-12-2003', 'dd-mm-yyyy')`;
-      const v_fechahasta = fechaHasta ? `TO_DATE('${fechaHasta}', 'dd-mm-yyyy') + 0.99999` : 'SYSDATE';
+      // Convertir fechas - usar parámetros bind para evitar SQL injection
+      const v_fechadesde = fechaDesde || DEFAULT_DATE;
+      const v_fechahasta = fechaHasta || null;
       
       // Query equivalente a Fisc_ConsultaMFTOC_GTIME sin XMLTYPE
       const query = `
@@ -631,13 +701,13 @@ export class OracleService {
                MFTOC.fechacreacion fechaaceptacion,
                MFTOC.fechaconformado,
                TO_CHAR(MFTOC.fechacreacion, 'dd-mm-yyyy hh24:mi') sfechaaceptacion,
-               NVL(MFTOC.totalguias, 0) totalguias,
-               NVL(MFTOC.totalpeso, 0) totalpeso,
-               NVL(MFTOC.totalmonto, 0) totalmonto,
-               NVL(MFTOC.totalGuiasMarcadas, 0) totalGuiasMarcadas,
+               COALESCE(MFTOC.totalguias, 0) totalguias,
+               COALESCE(MFTOC.totalpeso, 0) totalpeso,
+               COALESCE(MFTOC.totalmonto, 0) totalmonto,
+               COALESCE(MFTOC.totalGuiasMarcadas, 0) totalGuiasMarcadas,
                MFTOC.totalguiasmas30,
                MFTOC.esConformado,
-               CASE
+               COALESCE(CASE
                  WHEN (select count(*)
                          from DOCUMENTOS.docestados
                         WHERE (documento = MFTOC.id AND
@@ -645,7 +715,7 @@ export class OracleService {
                    'SI'
                  ELSE
                    'NO'
-               END esVisado,
+               END, 'NO') esVisado,
                -- Campos XML reemplazados por strings vacíos
                '' as xml,
                '' as madrereferenciada,
@@ -660,25 +730,25 @@ export class OracleService {
                      DB.fechacreacion,
                      DLE.locacion puertoembarque,
                      DLD.locacion puertodesembarque,
-                     SUM(CASE
+                     COALESCE(SUM(CASE
                            WHEN GANU.documento IS NULL THEN
                             1
                            ELSE
                             0
-                         END) totalguias,
-                     SUM(CASE
+                         END), 0) totalguias,
+                     COALESCE(SUM(CASE
                            WHEN GANU.documento IS NULL THEN
                             DT.totalPeso
                            ELSE
                             0
-                         END) totalPeso,
-                     SUM(CASE
+                         END), 0) totalPeso,
+                     COALESCE(SUM(CASE
                            WHEN GANU.documento IS NULL THEN
                             DT.valordeclarado
                            ELSE
                             0
-                         END) totalMonto,
-                     SUM(CASE
+                         END), 0) totalMonto,
+                     COALESCE(SUM(CASE
                            WHEN GANU.documento IS NULL AND
                                 DT.valordeclarado <= 500 AND EXISTS
                             (SELECT *
@@ -689,19 +759,19 @@ export class OracleService {
                             1
                            else
                             0
-                         END) totalGuiasMarcadas,
-                     SUM(CASE
+                         END), 0) totalGuiasMarcadas,
+                     COALESCE(SUM(CASE
                            WHEN GANU.documento IS NULL AND
                                 DT.valordeclarado > 500 THEN
                             1
                            else
                             0
-                         END) totalGuiasMas30,
+                         END), 0) totalGuiasMas30,
                      (SELECT MAX(ECMP.fecha)
                         FROM DOCUMENTOS.docestados ECMP
                        WHERE ECMP.documento = DB.id
                          AND ECMP.tipoestado = 'CMP') fechaconformado,
-                     CASE
+                     COALESCE(CASE
                        WHEN EXISTS (SELECT *
                                FROM DOCUMENTOS.docestados ECMP
                               WHERE ECMP.documento = DB.id
@@ -709,15 +779,15 @@ export class OracleService {
                         'SI'
                        ELSE
                         'NO'
-                     END esConformado,
+                     END, 'NO') esConformado,
                      DTM.viaje viaje,
-                     SUM(CASE
+                     COALESCE(SUM(CASE
                            WHEN GANU.documento IS NULL AND
                                 DBG.numeroexterno = :nroGuia THEN
                             1
                            ELSE
                             0
-                         END) existeGuia
+                         END), 0) existeGuia
                 FROM (SELECT id,
                              numeroexterno,
                              idemisor,
@@ -739,7 +809,8 @@ export class OracleService {
                        WHERE tipodocumento = 'MFTOC'
                          AND activo = 'S'
                          AND NVL(:nroManifiesto, '0') = '0'
-                         AND fechaversion BETWEEN ${v_fechadesde} AND ${v_fechahasta}
+                         AND fechaversion BETWEEN TO_DATE(:fechaDesde, '${ORACLE_DATE_FORMAT}') AND 
+                             CASE WHEN :fechaHasta IS NOT NULL THEN TO_DATE(:fechaHasta, '${ORACLE_DATE_FORMAT}') + 0.99999 ELSE SYSDATE END
                          AND (NVL(:idEmisor, 0) = 0 OR idemisor = :idEmisor)
                           
                       ) DB
@@ -789,7 +860,9 @@ export class OracleService {
       const result = await connection.execute(query, {
         nroManifiesto: nroManifiesto || '0',
         idEmisor: idEmisor || 0,
-        nroGuia: nroGuia || null
+        nroGuia: nroGuia || null,
+        fechaDesde: v_fechadesde,
+        fechaHasta: v_fechahasta
       });
       
       const processedRows = [];
@@ -803,6 +876,13 @@ export class OracleService {
       }
       
       this.logger.log(`✅ Consulta completa exitosa: ${processedRows.length} registros`);
+      
+      // Log de debug solo en desarrollo
+      if (process.env.NODE_ENV === 'development' && processedRows.length > 0) {
+        this.logger.debug(`🔍 Debug - esConformado: ${JSON.stringify(processedRows[0].ESCONFORMADO)}`);
+        this.logger.debug(`🔍 Debug - esVisado: ${JSON.stringify(processedRows[0].ESVISADO)}`);
+      }
+      
       return processedRows;
       
     } catch (error) {
