@@ -116,93 +116,79 @@ export class OracleService {
     nroGuia?: string
   ) {
     try {
-      // Validar parámetros
-      if ((!nroManifiesto || nroManifiesto.trim() === '') && 
-          (!fechaInicio || !fechaTermino)) {
-        return [];
-      }
-
-      // Si se proporciona número de manifiesto, ignorar fechas
-      if (nroManifiesto && nroManifiesto.trim() !== '') {
-        fechaInicio = null;
-        fechaTermino = null;
-      }
-
-      // Formatear fechas si se proporcionan
-      const fechaInicioFormateada = fechaInicio ? this.formatDate(fechaInicio) : null;
-      const fechaTerminoFormateada = fechaTermino ? this.formatDate(fechaTermino) : null;
-
-      // Configurar emisor
-      const emisorValue = (tipoCourier === TIPO_COURIER_EXTERNO && emisor) ? emisor : 0;
-
-      // Usar el procedimiento almacenado real
-      const connection = await this.getConnection();
+      this.logger.log('🔍 Usando consulta completa equivalente a Fisc_ConsultaMFTOC_GTIME');
       
-      if (!connection) {
-        throw new Error('No se pudo establecer conexión con Oracle');
-      }
+      // Usar el nuevo método completo que replica la función del PKB
+      const result = await this.consultaMftocGTIMECompleta(
+        fechaInicio,
+        fechaTermino,
+        nroManifiesto,
+        emisor,
+        nroGuia
+      );
 
-      try {
-        this.logger.log('Executing direct query to Oracle tables');
-        
-        // Consulta directa a las tablas reales
-        const query = this.buildDirectQuery(fechaInicioFormateada, fechaTerminoFormateada, nroManifiesto, emisorValue, nroGuia);
-        
-        const result = await connection.execute(query);
+      this.logger.log(`📊 Registros obtenidos de Oracle: ${result.length}`);
+      
+      // Si hay número de manifiesto específico, devolver directamente sin filtros adicionales
+      if (nroManifiesto && nroManifiesto.trim() !== '') {
+        this.logger.log('📋 Búsqueda por número de manifiesto específico - sin filtros adicionales');
         const processedRows = [];
         
-        for (const row of result.rows) {
-          const rowData = {};
-          result.metaData.forEach((col, index) => {
-            rowData[col.name] = row[index];
-          });
+        for (const row of result) {
+          const processedRow = this.mapConsultaMFTOCDirect(
+            row, 
+            (row as any).esVisado || 'PEND', 
+            (row as any).esConformado || 'NO', 
+            (row as any).madrereferenciada || '', 
+            (row as any).micreferenciado || '', 
+            (row as any).crtreferenciado || ''
+          );
+          processedRows.push(processedRow);
+        }
+        
+        this.logger.log(`✅ Procesamiento directo completado: ${processedRows.length} registros finales`);
+        return processedRows;
+      }
 
-          // Aplicar lógica de filtrado del código Java
-          const estaConformado = this.nvl((rowData as any).esConformado || 'NO');
-          const estaVisado = this.nvl((rowData as any).esVisado || 'PEND');
-          const madrereferenciada = (rowData as any).madrereferenciada;
-          const micreferenciado = (rowData as any).micreferenciado;
-          const crtreferenciado = (rowData as any).crtreferenciado;
+      // Solo aplicar filtros cuando se busca por fechas
+      const filteredRows = [];
+      
+      for (const row of result) {
+        const estaConformado = this.nvl((row as any).esConformado || 'NO');
+        const estaVisado = this.nvl((row as any).esVisado || 'PEND');
+        const madrereferenciada = (row as any).madrereferenciada;
+        const micreferenciado = (row as any).micreferenciado;
+        const crtreferenciado = (row as any).crtreferenciado;
 
-          // Aplicar filtros según el tipo de courier
-          if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
-              (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
-            continue;
-          }
-
-          // Aplicar filtros según el estado de visado
-          if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
-              (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
-              (estaVisado === VISADO_SI && visado === VISADO_SI) ||
-              visado === TODOS_VISADO) {
-            
-            const processedRow = this.mapConsultaMFTOCDirect(
-              rowData, 
-              estaVisado, 
-              estaConformado, 
-              madrereferenciada, 
-              micreferenciado, 
-              crtreferenciado
-            );
-            processedRows.push(processedRow);
-          }
+        // Aplicar filtros según el tipo de courier
+        if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
+            (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
+          continue;
         }
 
-        this.logger.log(`Returning ${processedRows.length} real records from Oracle direct query`);
-        return processedRows;
-        
-      } finally {
-        if (connection) {
-          try {
-            await connection.close();
-          } catch (closeError) {
-            this.logger.error('Error closing Oracle connection:', closeError);
-          }
+        // Aplicar filtros según el estado de visado
+        if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
+            (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
+            (estaVisado === VISADO_SI && visado === VISADO_SI) ||
+            visado === TODOS_VISADO) {
+          
+          const processedRow = this.mapConsultaMFTOCDirect(
+            row, 
+            estaVisado, 
+            estaConformado, 
+            madrereferenciada, 
+            micreferenciado, 
+            crtreferenciado
+          );
+          filteredRows.push(processedRow);
         }
       }
 
+      this.logger.log(`✅ Filtrado completado: ${filteredRows.length} registros finales`);
+      return filteredRows;
+
     } catch (error) {
-      this.logger.error('Error in consultaMftocGTIME:', error);
+      this.logger.error('❌ Error in consultaMftocGTIME:', error);
       throw error;
     }
   }
@@ -608,6 +594,223 @@ export class OracleService {
         if (connection) {
           await connection.close();
           this.logger.log('✅ Conexión cerrada en gtimeGetMarcasAsString');
+        }
+      } catch (closeError) {
+        this.logger.warn('⚠️ Error cerrando conexión:', closeError);
+      }
+    }
+  }
+
+  async consultaMftocGTIMECompleta(
+    fechaDesde?: string,
+    fechaHasta?: string,
+    nroManifiesto?: string,
+    idEmisor?: number,
+    nroGuia?: string
+  ) {
+    let connection;
+    try {
+      this.logger.log('🔍 Ejecutando consulta completa Fisc_ConsultaMFTOC_GTIME equivalente');
+      connection = await this.getConnection();
+      
+      // Convertir fechas
+      const v_fechadesde = fechaDesde ? `TO_DATE('${fechaDesde}', 'dd-mm-yyyy')` : `TO_DATE('31-12-2003', 'dd-mm-yyyy')`;
+      const v_fechahasta = fechaHasta ? `TO_DATE('${fechaHasta}', 'dd-mm-yyyy') + 0.99999` : 'SYSDATE';
+      
+      // Query equivalente a Fisc_ConsultaMFTOC_GTIME sin XMLTYPE
+      const query = `
+        SELECT MFTOC.id,
+               MFTOC.numeroexterno,
+               MFTOC.emisor,
+               MFTOC.numeroreferenciaoriginal,
+               MFTOC.fechacreacion,
+               MFTOC.puertoembarque,
+               MFTOC.puertodesembarque,
+               MFTOC.fechacreacion fechaaceptacion,
+               TO_CHAR(MFTOC.fechaconformado, 'dd-mm-yyyy hh24:mi') fechaconformado,
+               TO_CHAR(MFTOC.fechacreacion, 'dd-mm-yyyy hh24:mi') sfechaaceptacion,
+               NVL(MFTOC.totalguias, 0) totalguias,
+               NVL(MFTOC.totalpeso, 0) totalpeso,
+               NVL(MFTOC.totalmonto, 0) totalmonto,
+               NVL(MFTOC.totalGuiasMarcadas, 0) totalGuiasMarcadas,
+               MFTOC.totalguiasmas30,
+               MFTOC.esConformado,
+               CASE
+                 WHEN (select count(*)
+                         from DOCUMENTOS.docestados
+                        WHERE (documento = MFTOC.id AND
+                              TIPODOCUMENTO = 'MFTOC' AND tipoestado = 'VIS')) > 0 THEN
+                   'SI'
+                 ELSE
+                   'NO'
+               END esVisado,
+               -- Campos XML reemplazados por strings vacíos
+               '' as xml,
+               '' as madrereferenciada,
+               '' as micreferenciado,
+               '' as crtreferenciado,
+               MFTOC.viaje
+        FROM (SELECT DB.id,
+                     DB.numeroexterno,
+                     DB.emisor,
+                     DB.idemisor,
+                     DTM.numeroreferenciaoriginal,
+                     DB.fechacreacion,
+                     DLE.locacion puertoembarque,
+                     DLD.locacion puertodesembarque,
+                     SUM(CASE
+                           WHEN GANU.documento IS NULL THEN
+                            1
+                           ELSE
+                            0
+                         END) totalguias,
+                     SUM(CASE
+                           WHEN GANU.documento IS NULL THEN
+                            DT.totalPeso
+                           ELSE
+                            0
+                         END) totalPeso,
+                     SUM(CASE
+                           WHEN GANU.documento IS NULL THEN
+                            DT.valordeclarado
+                           ELSE
+                            0
+                         END) totalMonto,
+                     SUM(CASE
+                           WHEN GANU.documento IS NULL AND
+                                DT.valordeclarado <= 500 AND EXISTS
+                            (SELECT *
+                                   FROM DOCUMENTOS.docestados E
+                                  WHERE E.documento = DBG.id
+                                    AND E.TIPODOCUMENTO = DBG.TIPODOCUMENTO
+                                    AND E.tipoestado IN ('CON MARCA', 'VIS')) THEN
+                            1
+                           else
+                            0
+                         END) totalGuiasMarcadas,
+                     SUM(CASE
+                           WHEN GANU.documento IS NULL AND
+                                DT.valordeclarado > 500 THEN
+                            1
+                           else
+                            0
+                         END) totalGuiasMas30,
+                     (SELECT MAX(ECMP.fecha)
+                        FROM DOCUMENTOS.docestados ECMP
+                       WHERE ECMP.documento = DB.id
+                         AND ECMP.tipoestado = 'CMP') fechaconformado,
+                     CASE
+                       WHEN EXISTS (SELECT *
+                               FROM DOCUMENTOS.docestados ECMP
+                              WHERE ECMP.documento = DB.id
+                                AND ECMP.tipoestado = 'CMP') THEN
+                        'SI'
+                       ELSE
+                        'NO'
+                     END esConformado,
+                     DTM.viaje viaje,
+                     SUM(CASE
+                           WHEN GANU.documento IS NULL AND
+                                DBG.numeroexterno = :nroGuia THEN
+                            1
+                           ELSE
+                            0
+                         END) existeGuia
+                FROM (SELECT id,
+                             numeroexterno,
+                             idemisor,
+                             emisor,
+                             tipodocumento,
+                             fechacreacion
+                        FROM DOCUMENTOS.docdocumentobase
+                       WHERE tipodocumento = 'MFTOC'
+                         AND activo = 'S'
+                         AND numeroexterno = :nroManifiesto
+                      UNION
+                      SELECT id,
+                             numeroexterno,
+                             idemisor,
+                             emisor,
+                             tipodocumento,
+                             fechacreacion
+                        FROM DOCUMENTOS.docdocumentobase
+                       WHERE tipodocumento = 'MFTOC'
+                         AND activo = 'S'
+                         AND NVL(:nroManifiesto, '0') = '0'
+                         AND fechaversion BETWEEN ${v_fechadesde} AND ${v_fechahasta}
+                         AND (NVL(:idEmisor, 0) = 0 OR idemisor = :idEmisor)
+                          
+                      ) DB
+                LEFT JOIN DOCUMENTOS.docrelaciondocumento RD
+                  ON (RD.tiporelacion = 'REF' AND RD.activo = 'S' AND
+                     RD.docdestino = DB.id)
+                LEFT JOIN DOCUMENTOS.docdocumentobase DBG
+                  ON (DBG.id = RD.docorigen)
+                LEFT JOIN DOCTRANSPORTE.doctrandoctransporte DT
+                  ON (DT.id = DBG.id)
+                LEFT JOIN DOCUMENTOS.docestados DANU
+                  ON (DANU.documento = DB.id AND
+                     DANU.TIPODOCUMENTO = DB.TIPODOCUMENTO AND
+                     DANU.tipoestado = 'ANU')
+                LEFT JOIN DOCTRANSPORTE.DOCTRANMANIFIESTO DTM
+                  ON (DTM.id = DB.id)
+                LEFT JOIN DOCUMENTOS.doclocaciondocumento DLE
+                  ON (DLE.documento = DB.id AND DLE.activa = 'S' AND
+                     DLE.tipolocacion = 'PE')
+                LEFT JOIN DOCUMENTOS.doclocaciondocumento DLD
+                  ON (DLD.documento = DB.id AND DLD.activa = 'S' AND
+                     DLD.tipolocacion = 'PD')
+                LEFT JOIN DOCUMENTOS.docestados GANU
+                  ON (GANU.documento = DBG.id AND
+                     GANU.TIPODOCUMENTO = DBG.TIPODOCUMENTO AND
+                     GANU.tipoestado = 'ANU')
+               WHERE DANU.documento IS NULL
+                 AND (DBG.TIPODOCUMENTO IS NULL OR
+                     (DBG.TIPODOCUMENTO = 'GTIME' AND DBG.activo = 'S'))
+               GROUP BY DB.id,
+                        DB.numeroexterno,
+                        DB.emisor,
+                        DB.idemisor,
+                        DTM.numeroreferenciaoriginal,
+                        DB.fechacreacion,
+                        DLE.locacion,
+                        DLD.locacion,
+                        DTM.viaje) MFTOC
+        WHERE (NVL(:nroManifiesto, '0') = '0' OR MFTOC.numeroexterno = :nroManifiesto)
+          AND (NVL(:idEmisor, 0) = 0 OR MFTOC.idemisor = :idEmisor)
+          AND (:nroGuia IS NULL OR MFTOC.existeGuia > 0)
+        ORDER BY MFTOC.numeroexterno
+      `;
+      
+      this.logger.log(`📝 Ejecutando query completa equivalente a Fisc_ConsultaMFTOC_GTIME`);
+      
+      const result = await connection.execute(query, {
+        nroManifiesto: nroManifiesto || '0',
+        idEmisor: idEmisor || 0,
+        nroGuia: nroGuia || null
+      });
+      
+      const processedRows = [];
+      
+      for (const row of result.rows) {
+        const rowData = {};
+        result.metaData.forEach((col, index) => {
+          rowData[col.name] = row[index];
+        });
+        processedRows.push(rowData);
+      }
+      
+      this.logger.log(`✅ Consulta completa exitosa: ${processedRows.length} registros`);
+      return processedRows;
+      
+    } catch (error) {
+      this.logger.error('❌ Error en consultaMftocGTIMECompleta:', error);
+      throw error;
+    } finally {
+      try {
+        if (connection) {
+          await connection.close();
+          this.logger.log('✅ Conexión cerrada en consultaMftocGTIMECompleta');
         }
       } catch (closeError) {
         this.logger.warn('⚠️ Error cerrando conexión:', closeError);
