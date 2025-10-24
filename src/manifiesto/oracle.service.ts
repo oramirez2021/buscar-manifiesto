@@ -113,7 +113,9 @@ export class OracleService {
     visado?: string,
     tipoCourier?: string,
     nroManifiesto?: string,
-    nroGuia?: string
+    nroGuia?: string,
+    nombrePersona?: string,
+    pageCode?: string
   ) {
     try {
       this.logger.log('🔍 Usando consulta completa equivalente a Fisc_ConsultaMFTOC_GTIME');
@@ -355,7 +357,7 @@ export class OracleService {
       PuertoDesembarque: this.nvl(''), // No disponible en estas tablas
       FechaAceptacion: row.FECHACREACION ? row.FECHACREACION.toISOString() : null,
       FechaAceptacionFormateada: this.formatDateString(row.FECHACREACION),
-      FechaConformado: this.nvl(row.FECHAMARCACION),
+      FechaConformado: this.nvl(row.fechaconformado),
       TotalGuiasMarcadas: 0, // No disponible en estas tablas
       TotalGuiasMas30: 0, // No disponible en estas tablas
       EstaVisado: estaVisado,
@@ -627,7 +629,7 @@ export class OracleService {
                MFTOC.puertoembarque,
                MFTOC.puertodesembarque,
                MFTOC.fechacreacion fechaaceptacion,
-               TO_CHAR(MFTOC.fechaconformado, 'dd-mm-yyyy hh24:mi') fechaconformado,
+               MFTOC.fechaconformado,
                TO_CHAR(MFTOC.fechacreacion, 'dd-mm-yyyy hh24:mi') sfechaaceptacion,
                NVL(MFTOC.totalguias, 0) totalguias,
                NVL(MFTOC.totalpeso, 0) totalpeso,

@@ -37,7 +37,9 @@ export class ManifiestoService {
       consultaDto.EdVisado,
       consultaDto.EdTipoViaTransporte,
       consultaDto.EdNroManifiesto,
-      consultaDto.guiaCourier
+      consultaDto.guiaCourier,
+      consultaDto.EdNombrePersona,
+      consultaDto.MRevisionMFTOC_pageCode
     );
   }
 
