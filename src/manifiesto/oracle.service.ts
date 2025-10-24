@@ -139,8 +139,8 @@ export class OracleService {
         for (const row of result) {
           const processedRow = this.mapConsultaMFTOCDirect(
             row, 
-            (row as any).esVisado || 'PEND', 
-            (row as any).esConformado || 'NO', 
+            this.nvl((row as any).esVisado), 
+            this.nvl((row as any).esConformado), 
             (row as any).madrereferenciada || '', 
             (row as any).micreferenciado || '', 
             (row as any).crtreferenciado || ''
@@ -360,7 +360,7 @@ export class OracleService {
       FechaConformado: this.nvl(row.fechaconformado),
       TotalGuiasMarcadas: 0, // No disponible en estas tablas
       TotalGuiasMas30: 0, // No disponible en estas tablas
-      EstaVisado: estaVisado,
+      EstaVisado: this.nvl(row.esVisado) || 'NO',
       NroRefOriginal: this.nvl(row.NUMEROACEPTACION),
       Consolidado: estaConformado,
       crtreferenciado: this.nvl(crtreferenciado),
