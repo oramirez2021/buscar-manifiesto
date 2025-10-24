@@ -1,43 +1,16 @@
-import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, PrimaryColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
-@Entity({ name: 'manifiestos' })
+@Entity({ name: 'DOCDOCUMENTOBASE', schema: 'DOCUMENTOS' })
 export class ManifiestoEntity {
-  @PrimaryGeneratedColumn('uuid')
-  id!: string;
+  @PrimaryColumn({ name: 'ID', type: 'number' })
+  id!: number;
 
-  @Column({ type: 'varchar', length: 50, unique: true })
+  @Column({ name: 'NUMEROEXTERNO', type: 'varchar', length: 200 })
   numero!: string;
 
-  @Column({ type: 'date' })
-  fecha!: Date;
+  @Column({ name: 'EMISOR', type: 'varchar', length: 200, nullable: true })
+  emisor?: string;
 
-  @Column({ type: 'varchar', length: 50 })
-  estado!: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  tipoManifiesto?: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  origen?: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  destino?: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  transportista?: string;
-
-  @Column({ type: 'varchar', length: 20, nullable: true })
-  placa?: string;
-
-  @Column({ type: 'text', nullable: true })
-  observaciones?: string;
-
-  @Column({ type: 'json', nullable: true })
-  metadata?: Record<string, any>;
-
-  @CreateDateColumn()
-  createdAt!: Date;
-
-  @UpdateDateColumn()
-  updatedAt!: Date;
+  @Column({ name: 'FECHACREACION', type: 'date', nullable: true })
+  fechaCreacion?: Date;
 }

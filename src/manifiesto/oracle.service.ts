@@ -428,4 +428,154 @@ export class OracleService {
     }
   }
 
+  private buildDirectQueryFallback(numeroExterno: string): string {
+    return `
+      SELECT 
+        m.ID,
+        m.NUMEROEXTERNO,
+        m.EMISOR,
+        m.FECHACREACION,
+        m.ACTIVO,
+        m.TIPODOCUMENTO,
+        m.IDEMISOR,
+        NVL((SELECT dtm.numeroreferenciaoriginal
+              FROM doctransporte.doctranmanifiesto dtm
+             WHERE dtm.id = m.id), '') numeroreferenciaoriginal,
+        NVL((SELECT dtm.viaje
+              FROM doctransporte.doctranmanifiesto dtm
+             WHERE dtm.id = m.id), '') viaje,
+        NVL((SELECT locacion
+              FROM documentos.doclocaciondocumento a
+             WHERE a.documento = m.id
+               AND a.activa = 'S'
+               AND a.tipolocacion = 'PE'), '') puertoembarque,
+        NVL((SELECT locacion
+              FROM documentos.doclocaciondocumento a
+             WHERE a.documento = m.id
+               AND a.activa = 'S'
+               AND a.tipolocacion = 'PD'), '') puertodesembarque,
+        m.fechacreacion fechaaceptacion,
+        TO_CHAR(m.fechacreacion, 'dd-mm-yyyy hh24:mi') sfechaaceptacion,
+        NVL((SELECT 'SI'
+              FROM documentos.docestados est
+             WHERE m.tipodocumento = est.tipodocumento
+               AND m.id = est.documento
+               AND est.tipoestado = 'CMP'
+               AND est.activa = 'S'
+               AND ROWNUM = 1), 'NO') esConformado,
+        NVL((SELECT 'SI'
+              FROM documentos.docestados est
+             WHERE m.tipodocumento = est.tipodocumento
+               AND m.id = est.documento
+               AND est.tipoestado = 'VIS'
+               AND est.activa = 'S'
+               AND ROWNUM = 1), 'NO') esVisado,
+        '' as madrereferenciada,
+        '' as micreferenciado,
+        '' as crtreferenciado,
+        0 as totalguias,
+        0 as totalpeso,
+        0 as totalmonto,
+        0 as totalGuiasMarcadas,
+        0 as totalguiasmas30,
+        NULL as xml
+      FROM documentos.docdocumentobase m
+      WHERE m.tipodocumento = 'MFTOC'
+        AND m.activo = 'S'
+        AND UPPER(m.numeroexterno) LIKE UPPER('%${numeroExterno}%')
+      AND ROWNUM <= 10
+    `;
+  }
+
+  async testBasicQuery3(numeroExterno?: string) {
+    let connection;
+    try {
+      this.logger.log('🔍 Iniciando testBasicQuery3 con stored procedure nativo');
+      connection = await this.getConnection();
+      
+      let query: string;
+      let params: any[] = [];
+      
+    if (numeroExterno) {
+      // Usar la función Oracle original Fisc_ConsultaMFTOC_GTIME
+      query = `BEGIN :cursor := DOCUMENTOS.COURIER_CONSULTAS.Fisc_ConsultaMFTOC_GTIME(
+        :fechaDesde, :fechaHasta, :numeroManifiesto, :idEmisor, :nroGuia
+      ); END;`;
+      
+      const fechaHoy = new Date().toLocaleDateString('es-ES');
+      params = [
+        { type: oracledb.CURSOR, dir: oracledb.BIND_OUT },
+        fechaHoy, // fechaDesde
+        fechaHoy, // fechaHasta  
+        numeroExterno, // numeroManifiesto
+        0, // idEmisor
+        null // nroGuia
+      ];
+      } else {
+        // Query directa simple para obtener registros básicos
+        query = `SELECT ID, NUMEROEXTERNO, EMISOR, FECHACREACION 
+                 FROM DOCUMENTOS.DOCDOCUMENTOBASE 
+                 WHERE ROWNUM <= 10`;
+      }
+      
+      this.logger.log(`📝 Ejecutando query: ${query}`);
+      this.logger.log(`📝 Parámetros: ${JSON.stringify(params)}`);
+      
+      let result;
+      if (numeroExterno) {
+        try {
+          // Intentar usar la función Oracle original
+          result = await connection.execute(query, params);
+          const cursor = result.outBinds[0];
+          const rows = await cursor.getRows(10);
+          await cursor.close();
+          
+          // MANEJAR EL XMLTYPE PROBLEMÁTICO EN JAVASCRIPT
+          const processedRows = rows.map(row => {
+            const newRow = [...row];
+            // El campo XMLTYPE está en la posición 17 (según el contexto)
+            if (newRow[17] && typeof newRow[17].getStringVal === 'function') {
+              try {
+                // Convertir XMLTYPE a string
+                newRow[17] = newRow[17].getStringVal();
+              } catch (xmlError) {
+                // Si falla la conversión, usar null
+                newRow[17] = null;
+              }
+            }
+            return newRow;
+          });
+          
+          return processedRows;
+        } catch (xmlError) {
+          if (xmlError.code === 'ORA-00932') {
+            // Si falla por XMLTYPE, usar consulta directa como fallback
+            this.logger.warn('⚠️ XMLTYPE error detected, using direct query fallback');
+            const fallbackQuery = this.buildDirectQueryFallback(numeroExterno);
+            result = await connection.execute(fallbackQuery);
+            return result.rows;
+          }
+          throw xmlError;
+        }
+      } else {
+        // Query directa
+        result = await connection.execute(query);
+        return result.rows;
+      }
+      
+    } catch (error) {
+      this.logger.error('❌ Error en testBasicQuery3:', error);
+      throw error;
+    } finally {
+      try {
+        if (connection) {
+          await connection.close();
+          this.logger.log('✅ Conexión cerrada en testBasicQuery3');
+        }
+      } catch (closeError) {
+        this.logger.warn('⚠️ Error cerrando conexión:', closeError);
+      }
+    }
+  }
+
 }

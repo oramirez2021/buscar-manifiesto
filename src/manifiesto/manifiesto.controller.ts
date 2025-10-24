@@ -154,5 +154,35 @@ export class ManifiestoController {
       return { success: false, error: error.message };
     }
   }
+
+  @Public()
+  @Get('test-basic2')
+  @ApiOperation({ summary: 'Test básico con TypeORM' })
+  async testBasic2(@Query('numero') numero?: string) {
+    try {
+      console.log('🔍 Test básico2 (TypeORM) iniciado con número:', numero);
+      const result = await this.manifiestoService.testBasicQuery2(numero);
+      console.log('✅ Test básico2 exitoso:', result.length, 'registros');
+      return { success: true, count: result.length, data: result };
+    } catch (error) {
+      console.error('❌ Error en testBasic2:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  @Public()
+  @Get('test-basic3')
+  @ApiOperation({ summary: 'Test básico con stored procedure nativo' })
+  async testBasic3(@Query('numero') numero?: string) {
+    try {
+      console.log('🔍 Test básico3 (Stored Procedure) iniciado con número:', numero);
+      const result = await this.manifiestoService.testBasicQuery3(numero);
+      console.log('✅ Test básico3 exitoso:', result.length, 'registros');
+      return { success: true, count: result.length, data: result };
+    } catch (error) {
+      console.error('❌ Error en testBasic3:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
