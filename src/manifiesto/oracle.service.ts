@@ -578,4 +578,41 @@ export class OracleService {
     }
   }
 
+  async gtimeGetMarcasAsString(idgtime: number): Promise<string> {
+    let connection;
+    try {
+      this.logger.log(`🔍 Ejecutando gtime_getmarcasasstring para idgtime: ${idgtime}`);
+      connection = await this.getConnection();
+      
+      // Llamar directamente a la función Oracle
+      const query = `SELECT DOCUMENTOS.COURIER_CONSULTAS.gtime_getmarcasasstring(:idgtime) as marcas FROM DUAL`;
+      
+      this.logger.log(`📝 Ejecutando query: ${query}`);
+      this.logger.log(`📝 Parámetro idgtime: ${idgtime}`);
+      
+      const result = await connection.execute(query, [idgtime]);
+      
+      if (result.rows && result.rows.length > 0) {
+        const marcas = result.rows[0][0];
+        this.logger.log(`✅ Marcas obtenidas: ${marcas}`);
+        return marcas || '';
+      }
+      
+      return '';
+      
+    } catch (error) {
+      this.logger.error('❌ Error en gtimeGetMarcasAsString:', error);
+      throw error;
+    } finally {
+      try {
+        if (connection) {
+          await connection.close();
+          this.logger.log('✅ Conexión cerrada en gtimeGetMarcasAsString');
+        }
+      } catch (closeError) {
+        this.logger.warn('⚠️ Error cerrando conexión:', closeError);
+      }
+    }
+  }
+
 }

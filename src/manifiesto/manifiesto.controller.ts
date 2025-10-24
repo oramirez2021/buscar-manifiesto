@@ -184,5 +184,43 @@ export class ManifiestoController {
       return { success: false, error: error.message };
     }
   }
+
+  @Public()
+  @Get('marcas')
+  @ApiOperation({ summary: 'Obtener marcas de un documento GTIME usando gtime_getmarcasasstring' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Marcas obtenidas exitosamente.',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        idgtime: { type: 'number' },
+        marcas: { type: 'string' }
+      }
+    }
+  })
+  @ApiResponse({ status: 500, description: 'Error al obtener las marcas.' })
+  async getMarcas(@Query('idgtime') idgtime: string) {
+    try {
+      const idgtimeNumber = parseInt(idgtime);
+      if (isNaN(idgtimeNumber)) {
+        return { success: false, error: 'idgtime debe ser un número válido' };
+      }
+      
+      console.log(`🔍 Obteniendo marcas para idgtime: ${idgtimeNumber}`);
+      const marcas = await this.manifiestoService.gtimeGetMarcasAsString(idgtimeNumber);
+      console.log('✅ Marcas obtenidas exitosamente');
+      
+      return { 
+        success: true, 
+        idgtime: idgtimeNumber, 
+        marcas: marcas 
+      };
+    } catch (error) {
+      console.error('❌ Error en getMarcas:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }
 

@@ -76,4 +76,14 @@ export class ManifiestoService {
       throw error;
     }
   }
+
+  async gtimeGetMarcasAsString(idgtime: number) {
+    try {
+      console.log(`🔍 Obteniendo marcas para idgtime: ${idgtime}`);
+      return await this.oracleService.gtimeGetMarcasAsString(idgtime);
+    } catch (error) {
+      console.error('Error en gtimeGetMarcasAsString:', error);
+      throw error;
+    }
+  }
 }
