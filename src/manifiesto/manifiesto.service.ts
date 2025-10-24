@@ -14,7 +14,7 @@ export class ManifiestoService {
     @InjectRepository(ManifiestoEntity)
     private readonly manifiestoRepo: Repository<ManifiestoEntity>,
     private readonly oracleService: OracleService,
-  ) {}
+  ) { }
 
   // Métodos simplificados para el servicio básico
   async getEstados(): Promise<string[]> {

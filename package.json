@@ -10,6 +10,8 @@
     "build:docker": "npm run build && npm ci --only=production",
     "start": "nest start",
     "start:dev": "nest start --watch",
+    "start:debug": "./start-with-oracle.sh",
+    "debug": "node --inspect-brk -r ts-node/register node_modules/@nestjs/cli/bin/nest.js start --watch",
     "clean": "rm -rf dist layers/dependencies/nodejs/node_modules",
     "sam:build": "npm run build:lambda",
     "sam:deploy": "sam deploy --guided",

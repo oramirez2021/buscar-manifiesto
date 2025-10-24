@@ -275,7 +275,7 @@ export class OracleService {
           result.metaData.forEach((col, index) => {
             rowData[col.name] = row[index];
           });
-
+console.log('XML omar: ', rowData['XML']);
           simpleData.push({
             id: (rowData as any).ID,
             numero: (rowData as any).NUMEROEXTERNO,
@@ -381,7 +381,7 @@ export class OracleService {
   ) {
     const tipoRef = micreferenciado ? 'Courier Terrestre' : 'Courier Normal';
     const master = micreferenciado || madrereferenciada;
-
+  
     return {
       Oid: {
         Id: row.ID
@@ -721,7 +721,8 @@ export class OracleService {
                '' as madrereferenciada,
                '' as micreferenciado,
                '' as crtreferenciado,
-               MFTOC.viaje
+               MFTOC.viaje,
+               di.xml as xml
         FROM (SELECT DB.id,
                      DB.numeroexterno,
                      DB.emisor,
@@ -849,12 +850,20 @@ export class OracleService {
                         DLE.locacion,
                         DLD.locacion,
                         DTM.viaje) MFTOC
+        LEFT JOIN DOCUMENTOS.DOCIMAGEN DI ON (DI.documento = MFTOC.id)
         WHERE (NVL(:nroManifiesto, '0') = '0' OR MFTOC.numeroexterno = :nroManifiesto)
           AND (NVL(:idEmisor, 0) = 0 OR MFTOC.idemisor = :idEmisor)
           AND (:nroGuia IS NULL OR MFTOC.existeGuia > 0)
         ORDER BY MFTOC.numeroexterno
       `;
-      
+      console.log("query: ", query);
+      console.log("params: ", {
+        nroManifiesto: nroManifiesto || '0',
+        idEmisor: idEmisor || 0,
+        nroGuia: nroGuia || null,
+        fechaDesde: v_fechadesde,
+        fechaHasta: v_fechahasta
+      });
       this.logger.log(`📝 Ejecutando query completa equivalente a Fisc_ConsultaMFTOC_GTIME`);
       
       const result = await connection.execute(query, {
