@@ -315,72 +315,6 @@ export class OracleService {
   }
 
 
-  private buildDirectQuery(
-    fechaInicio?: string,
-    fechaTermino?: string,
-    nroManifiesto?: string,
-    emisor?: number,
-    nroGuia?: string
-  ): string {
-    let query = `
-      SELECT 
-        m.ID,
-        m.NUMEROEXTERNO,
-        m.NUMEROACEPTACION,
-        m.FECHACREACION,
-        m.FECHAEMISION,
-        m.ACTIVO,
-        m.TIPODOCUMENTO,
-        m.EMISOR,
-        m.IDEMISOR,
-        g.NUMEROEXTERNO as GUIA_NUMEROEXTERNO,
-        g.NUMEROACEPTACION as GUIA_NUMEROACEPTACION,
-        g.ID as GUIA_ID,
-        f.IDDOCUMENTO,
-        f.CODIGOOPFISCMOTIVOMARCA,
-        f.FECHAMARCACION,
-        f.ACTIVA as MARCA_ACTIVA,
-        CASE 
-          WHEN f.CODIGOOPFISCMOTIVOMARCA = 'F' THEN 'SI'
-          ELSE 'NO'
-        END as esConformado,
-        CASE 
-          WHEN f.ACTIVA = 'S' THEN 'SI'
-          ELSE 'PEND'
-        END as esVisado,
-        '' as madrereferenciada,
-        '' as micreferenciado,
-        '' as crtreferenciado
-      FROM DOCUMENTOS.DOCDOCUMENTOBASE m
-      LEFT JOIN DOCUMENTOS.DOCDOCUMENTOBASE g ON g.NUMEROACEPTACION = m.NUMEROACEPTACION AND g.TIPODOCUMENTO = 'GTIME' AND g.ACTIVO = 'S'
-      LEFT JOIN FISCALIZACIONES.OPFISCMARCA f ON f.IDDOCUMENTO = g.ID
-      WHERE m.TIPODOCUMENTO = 'MFTOC'
-        AND m.ACTIVO = 'S'
-    `;
-
-    // Agregar filtros según los parámetros
-    if (nroManifiesto && nroManifiesto.trim() !== '') {
-      query += ` AND UPPER(m.NUMEROEXTERNO) LIKE UPPER('%${nroManifiesto}%')`;
-    } else if (fechaInicio && fechaTermino) {
-      // Convertir fechas al formato correcto para Oracle
-      const fechaInicioOracle = this.convertToOracleDate(fechaInicio);
-      const fechaTerminoOracle = this.convertToOracleDate(fechaTermino);
-      query += ` AND m.FECHACREACION >= TO_DATE('${fechaInicioOracle}', 'DD/MM/YYYY')`;
-      query += ` AND m.FECHACREACION <= TO_DATE('${fechaTerminoOracle}', 'DD/MM/YYYY')`;
-    }
-
-    if (nroGuia && nroGuia.trim() !== '') {
-      query += ` AND UPPER(g.NUMEROEXTERNO) LIKE UPPER('%${nroGuia}%')`;
-    }
-
-    if (emisor && emisor > 0) {
-      query += ` AND m.IDEMISOR = ${emisor}`;
-    }
-
-    query += ` AND ROWNUM <= ${MAX_ROWS}`;
-
-    return query;
-  }
 
   private mapConsultaMFTOCDirect(
     row: OracleRow,
@@ -426,14 +360,6 @@ export class OracleService {
     return value || '';
   }
 
-  private formatDate(dateString: string): string {
-    // Convertir de YYYY-MM-DD a DD/MM/YYYY
-    const date = new Date(dateString);
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
 
   private convertToOracleDate(dateString: string): string {
     if (!dateString) {
