@@ -8,7 +8,6 @@ import awslambda from '@fastify/aws-lambda';
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context, SQSEvent } from 'aws-lambda';
 import { AppModule } from './app.module';
 import { httpHandler } from './handlers/http.handler';
-import { sqsHandler } from './handlers/sqs.handler';
 
 let cachedServer: any;
 
@@ -25,12 +24,12 @@ async function createNestServer() {
       // Swagger simplificado para Fastify
       const cfg = new DocumentBuilder().setTitle('Aduanas Service').setVersion('1.0.0').addBearerAuth().build();
       const doc = SwaggerModule.createDocument(app, cfg);
-      
+
       // Endpoint simple para obtener la documentación JSON
       fastifyApp.get('/api/docs-json', async (request, reply) => {
         return doc;
       });
-      
+
       // Función para generar HTML de documentación con Swagger UI
       const generateDocsHTML = () => `
         <!DOCTYPE html>
@@ -82,25 +81,25 @@ async function createNestServer() {
       });
 
       await app.init();
-      
+
       // Health check endpoint (después de inicializar NestJS)
       fastifyApp.get('/api/health', async (request, reply) => {
         return { status: 'OK', ts: new Date().toISOString() };
       });
-      
+
     } catch (error) {
       console.log('Error initializing NestJS app:', error.message);
-      
+
       // Health check básico si NestJS falla
       fastifyApp.get('/api/health', async (request, reply) => {
-        return { 
-          status: 'ERROR', 
+        return {
+          status: 'ERROR',
           ts: new Date().toISOString(),
           error: 'NestJS initialization failed'
         };
       });
     }
-    
+
     cachedServer = awslambda(fastifyApp);
   }
   return cachedServer;
@@ -117,8 +116,8 @@ export const handler = async (event: any, context: any) => {
         'Access-Control-Allow-Headers': 'Content-Type',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
       },
-      body: JSON.stringify({ 
-        status: 'OK', 
+      body: JSON.stringify({
+        status: 'OK',
         ts: new Date().toISOString(),
         service: 'Aduanas Service',
         version: '1.0.0'
@@ -128,17 +127,20 @@ export const handler = async (event: any, context: any) => {
 
   // Detectar si es un evento SQS
   if (event.Records && event.Records[0]?.eventSource === 'aws:sqs') {
-    console.log('Processing SQS event');
-    return sqsHandler(event as SQSEvent, context);
+    console.log('Processing SQS event - SQS handler removed');
+    return {
+      statusCode: 501,
+      body: JSON.stringify({ error: 'SQS handler not implemented' })
+    };
   }
 
   // Detectar si es un evento HTTP (API Gateway)
   if (event.httpMethod || event.requestContext) {
     console.log('Processing HTTP event');
-    
+
     const server = await createNestServer();
     const awsLambdaHandler = awslambda(server);
-    
+
     return awsLambdaHandler(event as APIGatewayProxyEvent, context);
   }
 

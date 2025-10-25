@@ -29,57 +29,7 @@ export class ManifiestoController {
     return { message: 'Manifiesto Service is running', status: 'ok' };
   }
 
-  @Get('estados')
-  @Roles('admin', 'user', 'viewer')
-  @ApiOperation({ summary: 'Obtener lista de estados disponibles' })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista de estados únicos.',
-    schema: {
-      type: 'array',
-      items: { type: 'string' }
-    }
-  })
-  getEstados() {
-    return this.manifiestoService.getEstados();
-  }
 
-  @Get('estadisticas')
-  @Roles('admin', 'user', 'viewer')
-  @ApiOperation({ summary: 'Obtener estadísticas de manifiestos' })
-  @ApiResponse({
-    status: 200,
-    description: 'Estadísticas de manifiestos por estado y tipo.',
-    schema: {
-      type: 'object',
-      properties: {
-        total: { type: 'number' },
-        porEstado: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              estado: { type: 'string' },
-              count: { type: 'number' }
-            }
-          }
-        },
-        porTipo: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              tipo: { type: 'string' },
-              count: { type: 'number' }
-            }
-          }
-        }
-      }
-    }
-  })
-  getEstadisticas() {
-    return this.manifiestoService.getEstadisticas();
-  }
 
   @Public()
   @Get('consulta-gtime')
@@ -113,88 +63,10 @@ export class ManifiestoController {
     }
   }
 
-  @Public()
-  @Get('test-oracle')
-  @ApiOperation({ summary: 'Test directo de Oracle' })
-  async testOracle() {
-    try {
-      console.log('🔍 Test directo de Oracle iniciado');
-      const result = await this.manifiestoService.consultaMftocGTIME({
-        EdFechaInicio: '01/01/2024',
-        EdFechaTermino: '31/12/2024',
-        EdVisado: 'TODOS',
-        EdTipoViaTransporte: 'TODOS'
-      });
-      console.log('✅ Test Oracle exitoso:', result.length, 'registros');
-      return { success: true, count: result.length, data: result.slice(0, 2) };
-    } catch (error) {
-      console.error('❌ Error en testOracle:', error);
-      return { success: false, error: error.message };
-    }
-  }
 
-  @Public()
-  @Get('test-simple')
-  @ApiOperation({ summary: 'Test simple sin fechas' })
-  async testSimple() {
-    try {
-      console.log('🔍 Test simple iniciado');
-      const result = await this.manifiestoService.consultaMftocGTIME({
-        EdVisado: 'TODOS',
-        EdTipoViaTransporte: 'TODOS'
-      });
-      console.log('✅ Test simple exitoso:', result.length, 'registros');
-      return { success: true, count: result.length, data: result.slice(0, 2) };
-    } catch (error) {
-      console.error('❌ Error en testSimple:', error);
-      return { success: false, error: error.message };
-    }
-  }
 
-  @Public()
-  @Get('test-basic')
-  @ApiOperation({ summary: 'Test básico con tabla simple' })
-  async testBasic(@Query('numero') numero?: string) {
-    try {
-      console.log('🔍 Test básico iniciado con número:', numero);
-      const result = await this.manifiestoService.testBasicQuery(numero);
-      console.log('✅ Test básico exitoso:', result.length, 'registros');
-      return { success: true, count: result.length, data: result };
-    } catch (error) {
-      console.error('❌ Error en testBasic:', error);
-      return { success: false, error: error.message };
-    }
-  }
 
-  @Public()
-  @Get('test-basic2')
-  @ApiOperation({ summary: 'Test básico con TypeORM' })
-  async testBasic2(@Query('numero') numero?: string) {
-    try {
-      console.log('🔍 Test básico2 (TypeORM) iniciado con número:', numero);
-      const result = await this.manifiestoService.testBasicQuery2(numero);
-      console.log('✅ Test básico2 exitoso:', result.length, 'registros');
-      return { success: true, count: result.length, data: result };
-    } catch (error) {
-      console.error('❌ Error en testBasic2:', error);
-      return { success: false, error: error.message };
-    }
-  }
 
-  @Public()
-  @Get('test-basic3')
-  @ApiOperation({ summary: 'Test básico con stored procedure nativo' })
-  async testBasic3(@Query('numero') numero?: string) {
-    try {
-      console.log('🔍 Test básico3 (Stored Procedure) iniciado con número:', numero);
-      const result = await this.manifiestoService.testBasicQuery3(numero);
-      console.log('✅ Test básico3 exitoso:', result.length, 'registros');
-      return { success: true, count: result.length, data: result };
-    } catch (error) {
-      console.error('❌ Error en testBasic3:', error);
-      return { success: false, error: error.message };
-    }
-  }
 
   @Public()
   @Get('marcas')
