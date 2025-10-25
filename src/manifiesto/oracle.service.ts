@@ -383,6 +383,9 @@ export class OracleService {
     micreferenciado: string,
     crtreferenciado: string
   ) {
+    micreferenciado = row.MICREFERENCIADO
+    madrereferenciada = row.MADREREFERENCIADA
+    crtreferenciado = row.CRTREFERENCIADO
     const tipoRef = micreferenciado ? 'Courier Terrestre' : 'Courier Normal';
     const master = micreferenciado || madrereferenciada;
 
@@ -392,7 +395,7 @@ export class OracleService {
       },
       NroReferencia: this.nvl(row.NUMEROEXTERNO),
       tipoRef: tipoRef,
-      NroGuiaMaster: '045-2541mock',
+      NroGuiaMaster: this.nvl(master),
       NroVuelo: 'VUELO-123mock', // Hardcoded para testing
       CiaCourier: this.nvl(row.EMISOR),
       CiaTransporte: this.nvl(row.EMISOR),
