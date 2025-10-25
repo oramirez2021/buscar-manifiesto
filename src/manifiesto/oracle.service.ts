@@ -396,7 +396,7 @@ export class OracleService {
       NroReferencia: this.nvl(row.NUMEROEXTERNO),
       tipoRef: tipoRef,
       NroGuiaMaster: this.nvl(master),
-      NroVuelo: 'VUELO-123mock', // Hardcoded para testing
+      NroVuelo: this.nvl(row.VIAJE), // Hardcoded para testing
       CiaCourier: this.nvl(row.EMISOR),
       CiaTransporte: this.nvl(row.EMISOR),
       NroGuiasAsociadas: 0, // No disponible en estas tablas
