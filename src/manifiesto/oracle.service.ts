@@ -396,19 +396,21 @@ export class OracleService {
       NroReferencia: this.nvl(row.NUMEROEXTERNO),
       tipoRef: tipoRef,
       NroGuiaMaster: this.nvl(master),
-      NroVuelo: this.nvl(row.VIAJE), // Hardcoded para testing
+      NroVuelo: this.nvl(row.VIAJE),
       CiaCourier: this.nvl(row.EMISOR),
       CiaTransporte: this.nvl(row.EMISOR),
-      NroGuiasAsociadas: 0, // No disponible en estas tablas
-      PesoGuias: 0, // No disponible en estas tablas
-      ValorTotal: 0, // No disponible en estas tablas
+      NroGuiasAsociadas: 0,
+      PesoGuias: this.nvl(row.TOTALPESO),
+      ValorTotal: this.nvl(row.TOTALMONTO),
       PuertoEmbarque: this.nvl(''), // No disponible en estas tablas
       PuertoDesembarque: this.nvl(''), // No disponible en estas tablas
       FechaAceptacion: row.FECHACREACION ? row.FECHACREACION.toISOString() : null,
       FechaAceptacionFormateada: this.formatDateString(row.FECHACREACION),
-      FechaConformado: this.nvl(row.fechaconformado),
-      TotalGuiasMarcadas: 0, // No disponible en estas tablas
-      TotalGuiasMas30: 0, // No disponible en estas tablas
+      FechaConformado: row.FECHACONFORMADO ? row.FECHACONFORMADO.toISOString() : null,
+      FechaConformadoFormateada: this.formatDateString(row.FECHACONFORMADO),
+      TotalGuias: parseInt(this.nvl(row.TOTALGUIAS)) || 0,
+      TotalGuiasMarcadas: parseInt(this.nvl(row.TOTALGUIASMARCADAS)) || 0,
+      TotalGuiasMas30: parseInt(this.nvl(row.TOTALGUIASMAS30)) || 0,
       EstaVisado: this.nvl(row.esVisado) || 'NO',
       NroRefOriginal: this.nvl(row.NUMEROACEPTACION),
       Consolidado: estaConformado,
