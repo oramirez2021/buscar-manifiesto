@@ -59,20 +59,20 @@ export class OracleService {
 
   private initializeOracle() {
     if (this.oracleInitialized) return;
-    
+
     try {
       // Configurar variables de entorno desde configuración
       const oracleHome = process.env.ORACLE_HOME;
       const ldLibraryPath = process.env.LD_LIBRARY_PATH;
-      
+
       if (!oracleHome) {
         throw new Error('ORACLE_HOME environment variable is not set');
       }
-      
+
       this.logger.log('🔧 Configuring Oracle environment variables:');
       this.logger.log(`  ORACLE_HOME: ${oracleHome}`);
       this.logger.log(`  LD_LIBRARY_PATH: ${ldLibraryPath || 'not set'}`);
-      
+
       // Verificar que las librerías existen
       const fs = require('fs');
       const libPath = `${oracleHome}/libnnz21.so`;
@@ -80,9 +80,9 @@ export class OracleService {
         throw new Error(`Oracle library not found at ${libPath}. Please ensure Oracle Instant Client is properly installed.`);
       }
       this.logger.log('✅ Oracle libraries found');
-      
+
       // Forzar modo Thick con configuración completa
-      oracledb.initOracleClient({ 
+      oracledb.initOracleClient({
         libDir: oracleHome,
         configDir: oracleHome
       });
@@ -118,9 +118,9 @@ export class OracleService {
       this.logger.warn('Oracle not initialized, attempting to initialize now...');
       this.initializeOracle();
     }
-    
+
     this.logger.log('Creating Oracle connection...');
-    
+
     // Validar variables de entorno requeridas
     const dbUsername = process.env.DB_USERNAME;
     const dbPassword = process.env.DB_PASSWORD;
@@ -138,7 +138,7 @@ export class OracleService {
         password: dbPassword,
         connectString: `${dbHost}:${dbPort}/${dbName}`
       });
-      
+
       this.logger.log('✅ Successfully connected to Oracle database');
       this.logger.log(`   - Oracle version: ${connection.oracleServerVersionString}`);
       return connection;
@@ -161,42 +161,46 @@ export class OracleService {
   ) {
     try {
       this.logger.log('🔍 Usando consulta completa equivalente a Fisc_ConsultaMFTOC_GTIME');
-      
+
       // Usar el nuevo método completo que replica la función del PKB
       const result = await this.consultaMftocGTIMECompleta(
         fechaInicio,
         fechaTermino,
         nroManifiesto,
         emisor,
-        nroGuia
+        nroGuia,
+        visado,
+        tipoCourier,
+        nombrePersona,
+        pageCode
       );
 
       this.logger.log(`📊 Registros obtenidos de Oracle: ${result.length}`);
-      
+
       // Si hay número de manifiesto específico, devolver directamente sin filtros adicionales
       if (nroManifiesto && nroManifiesto.trim() !== '') {
         this.logger.log('📋 Búsqueda por número de manifiesto específico - sin filtros adicionales');
         const processedRows = [];
-        
+
         for (const row of result) {
           const processedRow = this.mapConsultaMFTOCDirect(
-            row, 
-            this.nvl((row as any).esVisado), 
-            this.nvl((row as any).esConformado), 
-            (row as any).madrereferenciada || '', 
-            (row as any).micreferenciado || '', 
+            row,
+            this.nvl((row as any).esVisado),
+            this.nvl((row as any).esConformado),
+            (row as any).madrereferenciada || '',
+            (row as any).micreferenciado || '',
             (row as any).crtreferenciado || ''
           );
           processedRows.push(processedRow);
         }
-        
+
         this.logger.log(`✅ Procesamiento directo completado: ${processedRows.length} registros finales`);
         return processedRows;
       }
 
       // Solo aplicar filtros cuando se busca por fechas
       const filteredRows = [];
-      
+
       for (const row of result) {
         const estaConformado = this.nvl((row as any).esConformado || 'NO');
         const estaVisado = this.nvl((row as any).esVisado || 'PEND');
@@ -206,22 +210,22 @@ export class OracleService {
 
         // Aplicar filtros según el tipo de courier
         if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
-            (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
+          (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
           continue;
         }
 
         // Aplicar filtros según el estado de visado
         if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
-            (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
-            (estaVisado === VISADO_SI && visado === VISADO_SI) ||
-            visado === TODOS_VISADO) {
-          
+          (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
+          (estaVisado === VISADO_SI && visado === VISADO_SI) ||
+          visado === TODOS_VISADO) {
+
           const processedRow = this.mapConsultaMFTOCDirect(
-            row, 
-            estaVisado, 
-            estaConformado, 
-            madrereferenciada, 
-            micreferenciado, 
+            row,
+            estaVisado,
+            estaConformado,
+            madrereferenciada,
+            micreferenciado,
             crtreferenciado
           );
           filteredRows.push(processedRow);
@@ -240,9 +244,9 @@ export class OracleService {
   async testBasicQuery(numeroExterno?: string) {
     try {
       this.logger.log('Executing basic test query');
-      
+
       const connection = await this.getConnection();
-      
+
       if (!connection) {
         throw new Error('No se pudo establecer conexión con Oracle');
       }
@@ -266,16 +270,16 @@ export class OracleService {
         }
 
         query += ` AND ROWNUM <= 10`;
-        
+
         const result = await connection.execute(query);
         const simpleData = [];
-        
+
         for (const row of result.rows) {
           const rowData = {};
           result.metaData.forEach((col, index) => {
             rowData[col.name] = row[index];
           });
-console.log('XML omar: ', rowData['XML']);
+          console.log('XML omar: ', rowData['XML']);
           simpleData.push({
             id: (rowData as any).ID,
             numero: (rowData as any).NUMEROEXTERNO,
@@ -286,7 +290,7 @@ console.log('XML omar: ', rowData['XML']);
 
         this.logger.log(`Returning ${simpleData.length} basic records from Oracle`);
         return simpleData;
-        
+
       } finally {
         if (connection) {
           try {
@@ -381,14 +385,14 @@ console.log('XML omar: ', rowData['XML']);
   ) {
     const tipoRef = micreferenciado ? 'Courier Terrestre' : 'Courier Normal';
     const master = micreferenciado || madrereferenciada;
-  
+
     return {
       Oid: {
         Id: row.ID
       },
       NroReferencia: this.nvl(row.NUMEROEXTERNO),
       tipoRef: tipoRef,
-        NroGuiaMaster: '045-2541mock',
+      NroGuiaMaster: '045-2541mock',
       NroVuelo: 'VUELO-123mock', // Hardcoded para testing
       CiaCourier: this.nvl(row.EMISOR),
       CiaTransporte: this.nvl(row.EMISOR),
@@ -427,12 +431,12 @@ console.log('XML omar: ', rowData['XML']);
     if (!dateString) {
       throw new Error('Date string is required');
     }
-    
+
     // Asegurar que la fecha esté en formato DD/MM/YYYY
     if (dateString.includes('/')) {
       return dateString; // Ya está en formato correcto
     }
-    
+
     // Si está en formato YYYY-MM-DD, convertir a DD/MM/YYYY
     if (dateString.includes('-')) {
       const parts = dateString.split('-');
@@ -440,25 +444,25 @@ console.log('XML omar: ', rowData['XML']);
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
       }
     }
-    
+
     return dateString;
   }
 
   private isValidDate(dateString: string): boolean {
     if (!dateString) return false;
-    
+
     // Validar formato DD/MM/YYYY o DD-MM-YYYY
     const dateRegex = /^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/;
     const match = dateString.match(dateRegex);
-    
+
     if (!match) return false;
-    
+
     const [, day, month, year] = match;
     const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    
+
     return date.getFullYear() == parseInt(year) &&
-           date.getMonth() == parseInt(month) - 1 &&
-           date.getDate() == parseInt(day);
+      date.getMonth() == parseInt(month) - 1 &&
+      date.getDate() == parseInt(day);
   }
 
   private formatDateString(date: any): string {
@@ -466,7 +470,7 @@ console.log('XML omar: ', rowData['XML']);
     try {
       const dateObj = date instanceof Date ? date : new Date(date);
       if (isNaN(dateObj.getTime())) return '';
-      
+
       const day = dateObj.getDate().toString().padStart(2, '0');
       const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
       const year = dateObj.getFullYear();
@@ -543,35 +547,35 @@ console.log('XML omar: ', rowData['XML']);
     try {
       this.logger.log('🔍 Iniciando testBasicQuery3 con stored procedure nativo');
       connection = await this.getConnection();
-      
+
       let query: string;
       let params: any[] = [];
-      
-    if (numeroExterno) {
-      // Usar la función Oracle original Fisc_ConsultaMFTOC_GTIME
-      query = `BEGIN :cursor := DOCUMENTOS.COURIER_CONSULTAS.Fisc_ConsultaMFTOC_GTIME(
+
+      if (numeroExterno) {
+        // Usar la función Oracle original Fisc_ConsultaMFTOC_GTIME
+        query = `BEGIN :cursor := DOCUMENTOS.COURIER_CONSULTAS.Fisc_ConsultaMFTOC_GTIME(
         :fechaDesde, :fechaHasta, :numeroManifiesto, :idEmisor, :nroGuia
       ); END;`;
-      
-      const fechaHoy = new Date().toLocaleDateString('es-ES');
-      params = [
-        { type: oracledb.CURSOR, dir: oracledb.BIND_OUT },
-        fechaHoy, // fechaDesde
-        fechaHoy, // fechaHasta  
-        numeroExterno, // numeroManifiesto
-        0, // idEmisor
-        null // nroGuia
-      ];
+
+        const fechaHoy = new Date().toLocaleDateString('es-ES');
+        params = [
+          { type: oracledb.CURSOR, dir: oracledb.BIND_OUT },
+          fechaHoy, // fechaDesde
+          fechaHoy, // fechaHasta  
+          numeroExterno, // numeroManifiesto
+          0, // idEmisor
+          null // nroGuia
+        ];
       } else {
         // Query directa simple para obtener registros básicos
         query = `SELECT ID, NUMEROEXTERNO, EMISOR, FECHACREACION 
                  FROM DOCUMENTOS.DOCDOCUMENTOBASE 
                  WHERE ROWNUM <= 10`;
       }
-      
+
       this.logger.log(`📝 Ejecutando query: ${query}`);
       this.logger.log(`📝 Parámetros: ${JSON.stringify(params)}`);
-      
+
       let result;
       if (numeroExterno) {
         try {
@@ -580,7 +584,7 @@ console.log('XML omar: ', rowData['XML']);
           const cursor = result.outBinds[0];
           const rows = await cursor.getRows(10);
           await cursor.close();
-          
+
           // MANEJAR EL XMLTYPE PROBLEMÁTICO EN JAVASCRIPT
           const processedRows = rows.map(row => {
             const newRow = [...row];
@@ -596,7 +600,7 @@ console.log('XML omar: ', rowData['XML']);
             }
             return newRow;
           });
-          
+
           return processedRows;
         } catch (xmlError) {
           if (xmlError.code === 'ORA-00932') {
@@ -613,7 +617,7 @@ console.log('XML omar: ', rowData['XML']);
         result = await connection.execute(query);
         return result.rows;
       }
-      
+
     } catch (error) {
       this.logger.error('❌ Error en testBasicQuery3:', error);
       throw error;
@@ -634,23 +638,23 @@ console.log('XML omar: ', rowData['XML']);
     try {
       this.logger.log(`🔍 Ejecutando gtime_getmarcasasstring para idgtime: ${idgtime}`);
       connection = await this.getConnection();
-      
+
       // Llamar directamente a la función Oracle
       const query = `SELECT DOCUMENTOS.COURIER_CONSULTAS.gtime_getmarcasasstring(:idgtime) as marcas FROM DUAL`;
-      
+
       this.logger.log(`📝 Ejecutando query: ${query}`);
       this.logger.log(`📝 Parámetro idgtime: ${idgtime}`);
-      
+
       const result = await connection.execute(query, [idgtime]);
-      
+
       if (result.rows && result.rows.length > 0) {
         const marcas = result.rows[0][0];
         this.logger.log(`✅ Marcas obtenidas: ${marcas}`);
         return marcas || '';
       }
-      
+
       return '';
-      
+
     } catch (error) {
       this.logger.error('❌ Error en gtimeGetMarcasAsString:', error);
       throw error;
@@ -671,7 +675,11 @@ console.log('XML omar: ', rowData['XML']);
     fechaHasta?: string,
     nroManifiesto?: string,
     idEmisor?: number,
-    nroGuia?: string
+    nroGuia?: string,
+    visado?: string,
+    tipoCourier?: string,
+    nombrePersona?: string,
+    pageCode?: string
   ) {
     // Validar parámetros de entrada
     if (fechaDesde && !this.isValidDate(fechaDesde)) {
@@ -684,11 +692,11 @@ console.log('XML omar: ', rowData['XML']);
     try {
       this.logger.log('🔍 Ejecutando consulta completa Fisc_ConsultaMFTOC_GTIME equivalente');
       connection = await this.getConnection();
-      
+
       // Convertir fechas - usar parámetros bind para evitar SQL injection
       const v_fechadesde = fechaDesde || DEFAULT_DATE;
       const v_fechahasta = fechaHasta || null;
-      
+
       // Query equivalente a Fisc_ConsultaMFTOC_GTIME sin XMLTYPE
       const query = `
         SELECT MFTOC.id,
@@ -718,9 +726,10 @@ console.log('XML omar: ', rowData['XML']);
                END, 'NO') esVisado,
                -- Campos XML reemplazados por strings vacíos
                '' as xml,
-               '' as madrereferenciada,
-               '' as micreferenciado,
-               '' as crtreferenciado,
+               -- AQUI CAMBIÉ: Solo los campos extraídos, sin el XML completo
+               EXTRACTVALUE(XMLTYPE(DI.xml), '//Referencias/referencia[tipo-documento=''GA'']/numero/text()') as madrereferenciada,
+               EXTRACTVALUE(XMLTYPE(DI.xml), '//Referencias/referencia[tipo-documento=''MIC'']/numero/text()') as micreferenciado,
+               EXTRACTVALUE(XMLTYPE(DI.xml), '//Referencias/referencia[tipo-documento=''CRT'']/numero/text()') as crtreferenciado,
                MFTOC.viaje,
                di.xml as xml
         FROM (SELECT DB.id,
@@ -865,7 +874,7 @@ console.log('XML omar: ', rowData['XML']);
         fechaHasta: v_fechahasta
       });
       this.logger.log(`📝 Ejecutando query completa equivalente a Fisc_ConsultaMFTOC_GTIME`);
-      
+
       const result = await connection.execute(query, {
         nroManifiesto: nroManifiesto || '0',
         idEmisor: idEmisor || 0,
@@ -873,9 +882,9 @@ console.log('XML omar: ', rowData['XML']);
         fechaDesde: v_fechadesde,
         fechaHasta: v_fechahasta
       });
-      
+
       const processedRows = [];
-      
+
       for (const row of result.rows) {
         const rowData = {};
         result.metaData.forEach((col, index) => {
@@ -883,17 +892,17 @@ console.log('XML omar: ', rowData['XML']);
         });
         processedRows.push(rowData);
       }
-      
+
       this.logger.log(`✅ Consulta completa exitosa: ${processedRows.length} registros`);
-      
+
       // Log de debug solo en desarrollo
       if (process.env.NODE_ENV === 'development' && processedRows.length > 0) {
         this.logger.debug(`🔍 Debug - esConformado: ${JSON.stringify(processedRows[0].ESCONFORMADO)}`);
         this.logger.debug(`🔍 Debug - esVisado: ${JSON.stringify(processedRows[0].ESVISADO)}`);
       }
-      
+
       return processedRows;
-      
+
     } catch (error) {
       this.logger.error('❌ Error en consultaMftocGTIMECompleta:', error);
       throw error;
