@@ -167,6 +167,7 @@ export class OracleService {
 
       // Si hay número de manifiesto específico, devolver directamente sin filtros adicionales
       if (nroManifiesto && nroManifiesto.trim() !== '') {
+
         // Usar el nuevo método completo que replica la función del PKB
         result = await this.consultaMftocGTIMECompleta(
           fechaInicio,
@@ -179,19 +180,31 @@ export class OracleService {
           nombrePersona,
           pageCode
         );
-        this.logger.log('📋 Búsqueda por número de manifiesto específico - sin filtros adicionales');
+
         const processedRows = [];
 
         for (const row of result) {
           const processedRow = this.mapConsultaMFTOCDirect(
-            row,
-            this.nvl((row as any).esVisado),
-            this.nvl((row as any).esConformado),
-            (row as any).madrereferenciada || '',
-            (row as any).micreferenciado || '',
-            (row as any).crtreferenciado || ''
+            row
           );
-          processedRows.push(processedRow);
+          const estaConformado = this.nvl((row as any).ESCONFORMADO || 'NO');
+          const estaVisado = this.nvl((row as any).ESVISADO || 'PEND');
+          const madrereferenciada = (row as any).MADREREFERENCIADA;
+          const micreferenciado = (row as any).MICREFERENCIADO;
+          const crtreferenciado = (row as any).CRTREFERENCIADO;
+
+          // Aplicar filtros según el tipo de courier
+          if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
+            (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
+            continue;
+          }
+          // Aplicar filtros según el estado de visado
+          if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
+            (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
+            (estaVisado === VISADO_SI && visado === VISADO_SI) ||
+            visado === TODOS_VISADO) {
+            processedRows.push(processedRow);
+          }
         }
 
         this.logger.log(`✅ Procesamiento directo completado: ${processedRows.length} registros finales`);
@@ -219,12 +232,7 @@ export class OracleService {
             visado === TODOS_VISADO) {
 
             const processedRow = this.mapConsultaMFTOCDirect(
-              row,
-              estaVisado,
-              estaConformado,
-              madrereferenciada,
-              micreferenciado,
-              crtreferenciado
+              row
             );
             filteredRows.push(processedRow);
           }
@@ -376,15 +384,11 @@ export class OracleService {
 
   private mapConsultaMFTOCDirect(
     row: OracleRow,
-    estaVisado: string,
-    estaConformado: string,
-    madrereferenciada: string,
-    micreferenciado: string,
-    crtreferenciado: string
+
   ) {
-    micreferenciado = row.MICREFERENCIADO
-    madrereferenciada = row.MADREREFERENCIADA
-    crtreferenciado = row.CRTREFERENCIADO
+    const micreferenciado = row.MICREFERENCIADO
+    const madrereferenciada = row.MADREREFERENCIADA
+    const crtreferenciado = row.CRTREFERENCIADO
     const tipoRef = micreferenciado ? 'Courier Terrestre' : 'Courier Normal';
     const master = micreferenciado || madrereferenciada;
 
@@ -412,7 +416,7 @@ export class OracleService {
       TotalGuiasMas30: parseInt(this.nvl(row.TOTALGUIASMAS30)) || 0,
       EstaVisado: this.nvl(row.esVisado) || 'NO',
       NroRefOriginal: this.nvl(row.NUMEROACEPTACION),
-      Consolidado: estaConformado,
+      Consolidado: this.nvl(row.ESCONFORMADO),
       crtreferenciado: this.nvl(crtreferenciado),
       observacion: this.nvl('')
     };
