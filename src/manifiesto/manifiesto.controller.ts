@@ -1,12 +1,12 @@
-import { 
-  Controller, 
-  Get, 
+import {
+  Controller,
+  Get,
   Query
 } from '@nestjs/common';
-import { 
-  ApiBearerAuth, 
-  ApiTags, 
-  ApiOperation, 
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
   ApiResponse
 } from '@nestjs/swagger';
 import { Public } from '../auth/public.decorator';
@@ -19,7 +19,7 @@ import { ManifiestoGtimeResponseDto } from './dto/manifiesto-gtime-response.dto'
 @ApiBearerAuth()
 @Controller('manifiestos')
 export class ManifiestoController {
-  constructor(private readonly manifiestoService: ManifiestoService) {}
+  constructor(private readonly manifiestoService: ManifiestoService) { }
 
   @Public()
   @Get('health')
@@ -32,8 +32,8 @@ export class ManifiestoController {
   @Get('estados')
   @Roles('admin', 'user', 'viewer')
   @ApiOperation({ summary: 'Obtener lista de estados disponibles' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lista de estados únicos.',
     schema: {
       type: 'array',
@@ -47,16 +47,16 @@ export class ManifiestoController {
   @Get('estadisticas')
   @Roles('admin', 'user', 'viewer')
   @ApiOperation({ summary: 'Obtener estadísticas de manifiestos' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Estadísticas de manifiestos por estado y tipo.',
     schema: {
       type: 'object',
       properties: {
         total: { type: 'number' },
-        porEstado: { 
-          type: 'array', 
-          items: { 
+        porEstado: {
+          type: 'array',
+          items: {
             type: 'object',
             properties: {
               estado: { type: 'string' },
@@ -64,9 +64,9 @@ export class ManifiestoController {
             }
           }
         },
-        porTipo: { 
-          type: 'array', 
-          items: { 
+        porTipo: {
+          type: 'array',
+          items: {
             type: 'object',
             properties: {
               tipo: { type: 'string' },
@@ -84,8 +84,8 @@ export class ManifiestoController {
   @Public()
   @Get('consulta-gtime')
   @ApiOperation({ summary: 'Consulta manifiestos GTIME desde Oracle' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Lista de manifiestos GTIME encontrados.',
     type: [ManifiestoGtimeResponseDto]
   })
@@ -93,7 +93,18 @@ export class ManifiestoController {
   async consultaGtime(@Query() consultaDto: ConsultaGtimeDto) {
     try {
       console.log('🔍 Consulta recibida:', consultaDto);
-      const result = await this.manifiestoService.consultaMftocGTIME(consultaDto);
+
+      // LÓGICA CONDICIONAL: Si hay número de manifiesto, usar consultaMftocGTIME (existente)
+      // Si NO hay número de manifiesto, usar consultaMFTOC (nuevo)
+      let result;
+      if (consultaDto.EdNroManifiesto && consultaDto.EdNroManifiesto.trim() !== '') {
+        console.log('📋 Búsqueda por número de manifiesto específico - usando consultaMftocGTIME');
+        result = await this.manifiestoService.consultaMftocGTIME(consultaDto);
+      } else {
+        console.log('📅 Búsqueda por fechas - usando consultaMFTOC');
+        result = await this.manifiestoService.consultaMFTOC(consultaDto);
+      }
+
       console.log('✅ Resultado obtenido:', result.length, 'registros');
       return result;
     } catch (error) {
@@ -188,8 +199,8 @@ export class ManifiestoController {
   @Public()
   @Get('marcas')
   @ApiOperation({ summary: 'Obtener marcas de un documento GTIME usando gtime_getmarcasasstring' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Marcas obtenidas exitosamente.',
     schema: {
       type: 'object',
@@ -207,15 +218,15 @@ export class ManifiestoController {
       if (isNaN(idgtimeNumber)) {
         return { success: false, error: 'idgtime debe ser un número válido' };
       }
-      
+
       console.log(`🔍 Obteniendo marcas para idgtime: ${idgtimeNumber}`);
       const marcas = await this.manifiestoService.gtimeGetMarcasAsString(idgtimeNumber);
       console.log('✅ Marcas obtenidas exitosamente');
-      
-      return { 
-        success: true, 
-        idgtime: idgtimeNumber, 
-        marcas: marcas 
+
+      return {
+        success: true,
+        idgtime: idgtimeNumber,
+        marcas: marcas
       };
     } catch (error) {
       console.error('❌ Error en getMarcas:', error);

@@ -356,6 +356,47 @@ export class OracleService {
     };
   }
 
+  private mapConsultaMFTOCFiltroDirect(
+    row: OracleRow,
+    estaVisado: string,
+    estaConformado: string,
+    madrereferenciada: string,
+    micreferenciado: string,
+    crtreferenciado: string
+  ) {
+    const tipoRef = micreferenciado ? 'Courier Terrestre' : 'Courier Normal';
+    const master = micreferenciado || madrereferenciada;
+
+    return {
+      Oid: {
+        Id: row.ID
+      },
+      NroReferencia: this.nvl(row.NUMEROEXTERNO),
+      tipoRef: tipoRef,
+      NroGuiaMaster: this.nvl(master),
+      NroVuelo: this.nvl(row.VIAJE),
+      CiaCourier: this.nvl(row.EMISOR),
+      CiaTransporte: this.nvl(row.EMISOR),
+      NroGuiasAsociadas: parseInt(this.nvl(row.TOTALGUIAS)) || 0,
+      PesoGuias: this.nvl(row.TOTALPESO),
+      ValorTotal: this.nvl(row.TOTALMONTO),
+      PuertoEmbarque: this.nvl(row.PUERTOEMBARQUE),
+      PuertoDesembarque: this.nvl(row.PUERTODESEMBARQUE),
+      FechaAceptacion: row.FECHACREACION ? row.FECHACREACION.toISOString() : null,
+      FechaAceptacionFormateada: this.formatDateString(row.FECHACREACION),
+      FechaConformado: row.FECHACONFORMADO ? this.formatDateString(row.FECHACONFORMADO) : null,
+      FechaConformadoFormateada: this.formatDateString(row.FECHACONFORMADO),
+      TotalGuias: parseInt(this.nvl(row.TOTALGUIAS)) || 0,
+      TotalGuiasMarcadas: parseInt(this.nvl(row.TOTALGUIASMARCADAS)) || 0,
+      TotalGuiasMas30: parseInt(this.nvl(row.TOTALGUIASMAS30)) || 0,
+      EstaVisado: estaVisado,
+      NroRefOriginal: this.nvl(row.NUMEROACEPTACION),
+      Consolidado: estaConformado,
+      crtreferenciado: this.nvl(crtreferenciado),
+      observacion: this.nvl('')
+    };
+  }
+
   private nvl(value: any): string {
     return value || '';
   }
@@ -397,6 +438,24 @@ export class OracleService {
     return date.getFullYear() == parseInt(year) &&
       date.getMonth() == parseInt(month) - 1 &&
       date.getDate() == parseInt(day);
+  }
+
+  private isValidDateRange(fechaInicio: string, fechaTermino: string, maxDays: number = 31): boolean {
+    if (!fechaInicio || !fechaTermino) return false;
+
+    // Convertir fechas DD/MM/YYYY a Date
+    const parseDate = (dateStr: string) => {
+      const [day, month, year] = dateStr.split(/[\/\-]/);
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    };
+
+    const inicio = parseDate(fechaInicio);
+    const fin = parseDate(fechaTermino);
+
+    const diffTime = Math.abs(fin.getTime() - inicio.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return diffDays <= maxDays;
   }
 
   private formatDateString(date: any): string {
@@ -845,6 +904,320 @@ export class OracleService {
         if (connection) {
           await connection.close();
           this.logger.log('✅ Conexión cerrada en consultaMftocGTIMECompleta');
+        }
+      } catch (closeError) {
+        this.logger.warn('⚠️ Error cerrando conexión:', closeError);
+      }
+    }
+  }
+
+  async consultaMFTOC(
+    emisor?: number,
+    fechaInicio?: string,
+    fechaTermino?: string,
+    visado?: string,
+    tipoCourier?: string,
+    nroManifiesto?: string,
+    nroGuia?: string,
+    nombrePersona?: string,
+    pageCode?: string
+  ) {
+    try {
+      this.logger.log('🔍 Usando consulta MFTOC equivalente a ConsultaMFTOC del Java');
+
+      // Validar parámetros como en Java (líneas 126-133)
+      if ((!nroManifiesto || nroManifiesto.trim() === '') &&
+        (!fechaInicio || !fechaTermino)) {
+        this.logger.log('⚠️ No hay parámetros válidos para la consulta');
+        return [];
+      }
+
+      // Validar formato de fechas
+      if (fechaInicio && !this.isValidDate(fechaInicio)) {
+        throw new Error('Invalid fechaInicio format. Expected DD/MM/YYYY or DD-MM-YYYY');
+      }
+      if (fechaTermino && !this.isValidDate(fechaTermino)) {
+        throw new Error('Invalid fechaTermino format. Expected DD/MM/YYYY or DD-MM-YYYY');
+      }
+
+      // Validar rango de fechas (máximo 31 días)
+      if (fechaInicio && fechaTermino && !this.isValidDateRange(fechaInicio, fechaTermino, 31)) {
+        throw new Error('Date range exceeds maximum allowed 31 days');
+      }
+
+      // Usar el nuevo método completo que replica la función del PKB
+      const result = await this.consultaMFTOCCompleta(
+        fechaInicio,
+        fechaTermino,
+        nroManifiesto,
+        emisor
+      );
+
+      this.logger.log(`📊 Registros obtenidos de Oracle: ${result.length}`);
+
+      // Aplicar filtros como en Java (líneas 163-174)
+      const filteredRows = [];
+
+      for (const row of result) {
+        const estaConformado = this.nvl((row as any).ESCONFORMADO || 'NO');
+        const estaVisado = this.nvl((row as any).ESVISADO || 'PEND');
+        const madrereferenciada = (row as any).MADREREFERENCIADA;
+        const micreferenciado = (row as any).MICREFERENCIADO;
+        const crtreferenciado = (row as any).CRTREFERENCIADO;
+
+        // Aplicar filtros según el tipo de courier (líneas 163-166 del Java)
+        if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
+          (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
+          continue;
+        }
+
+        // Aplicar filtros según el estado de visado (líneas 168-174 del Java)
+        if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
+          (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
+          (estaVisado === VISADO_SI && visado === VISADO_SI) ||
+          visado === TODOS_VISADO) {
+
+          const processedRow = this.mapConsultaMFTOCFiltroDirect(
+            row,
+            estaVisado,
+            estaConformado,
+            madrereferenciada,
+            micreferenciado,
+            crtreferenciado
+          );
+          filteredRows.push(processedRow);
+        }
+      }
+
+      this.logger.log(`✅ Filtrado completado: ${filteredRows.length} registros finales`);
+      return filteredRows;
+
+    } catch (error) {
+      this.logger.error('❌ Error in consultaMFTOC:', error);
+      throw error;
+    }
+  }
+
+  async consultaMFTOCCompleta(
+    fechaDesde?: string,
+    fechaHasta?: string,
+    nroManifiesto?: string,
+    idEmisor?: number,
+    nroGuia?: string,
+    visado?: string,
+    tipoCourier?: string,
+    nombrePersona?: string,
+    pageCode?: string
+  ) {
+
+    let connection;
+    try {
+      this.logger.log('🔍 Ejecutando consulta completa equivalente a Fisc_ConsultaMFTOC');
+      connection = await this.getConnection();
+
+      // Convertir fechas - usar parámetros bind para evitar SQL injection
+      const v_fechadesde = fechaDesde || DEFAULT_DATE;
+      const v_fechahasta = fechaHasta || null;
+
+      // Query equivalente a Fisc_ConsultaMFTOC sin XMLTYPE
+      const query = `
+        SELECT MFTOC.id,
+           MFTOC.numeroexterno,
+           MFTOC.emisor,
+           MFTOC.numeroreferenciaoriginal,
+           MFTOC.fechacreacion,
+           MFTOC.puertoembarque,
+           MFTOC.puertodesembarque,
+           MFTOC.fechacreacion fechaaceptacion,
+           TO_CHAR(MFTOC.fechaconformado, 'dd-mm-yyyy hh24:mi') fechaconformado,
+           TO_CHAR(MFTOC.fechacreacion, 'dd-mm-yyyy hh24:mi') sfechaaceptacion,
+           NVL(MFTOC.totalguias, 0) totalguias,
+           NVL(MFTOC.totalpeso, 0) totalpeso,
+           NVL(MFTOC.totalmonto, 0) totalmonto,
+           NVL(MFTOC.totalGuiasMarcadas, 0) totalGuiasMarcadas,
+           MFTOC.totalguiasmas30,
+           MFTOC.esConformado,
+           --MFTOC.esVisado,
+           CASE
+             WHEN (select count(*)
+                     from DOCUMENTOS.docestados
+                    WHERE (documento = MFTOC.id AND
+                          TIPODOCUMENTO = 'MFTOC' AND tipoestado = 'VIS')) > 0 THEN
+              'SI'
+             ELSE
+              'NO'
+           END esVisado, --JANO PROBAR
+           XMLTYPE(DI.xml) xml,
+           EXTRACTVALUE(XMLTYPE(DI.xml),
+                        '//Referencias/referencia[tipo-documento=''GA'']/numero/text()') madrereferenciada,
+           EXTRACTVALUE(XMLTYPE(DI.xml),
+                        '//Referencias/referencia[tipo-documento=''MIC'']/numero/text()') micreferenciado,
+           EXTRACTVALUE(XMLTYPE(DI.xml),
+                        '//Referencias/referencia[tipo-documento=''CRT'']/numero/text()') crtreferenciado,
+           NVL(TRIM(MFTOC.viaje),
+               EXTRACTVALUE(XMLTYPE(DI.xml),
+                            '//OpTransporte/optransporte/numero-viaje/text()')) viaje
+      FROM (SELECT DB.id,
+                   DB.numeroexterno,
+                   DB.emisor,
+                   DB.idemisor,
+                   DTM.numeroreferenciaoriginal,
+                   DB.fechacreacion,
+                   DLE.locacion puertoembarque,
+                   DLD.locacion puertodesembarque,
+                   SUM(CASE
+                         WHEN GANU.documento IS NULL THEN
+                          1
+                         ELSE
+                          0
+                       END) totalguias,
+                   SUM(CASE
+                         WHEN GANU.documento IS NULL THEN
+                          DT.totalPeso
+                         ELSE
+                          0
+                       END) totalPeso,
+                   SUM(CASE
+                         WHEN GANU.documento IS NULL THEN
+                          DT.valordeclarado
+                         ELSE
+                          0
+                       END) totalMonto,
+                   SUM(CASE
+                         WHEN GANU.documento IS NULL AND
+                              DT.valordeclarado <= 500 AND EXISTS
+                          (SELECT *
+                                 FROM DOCUMENTOS.docestados E
+                                WHERE E.documento = DBG.id
+                                  AND E.TIPODOCUMENTO = DBG.TIPODOCUMENTO
+                                  AND E.tipoestado IN ('CON MARCA', 'VIS')) THEN
+                          1
+                         else
+                          0
+                       END) totalGuiasMarcadas,
+                   SUM(CASE
+                         WHEN GANU.documento IS NULL AND
+                              DT.valordeclarado > 500 THEN
+                          1
+                         else
+                          0
+                       END) totalGuiasMas30,
+                   (SELECT MAX(ECMP.fecha)
+                      FROM DOCUMENTOS.docestados ECMP
+                     WHERE ECMP.documento = DB.id
+                       AND ECMP.tipoestado = 'CMP') fechaconformado,
+                   CASE
+                     WHEN EXISTS (SELECT *
+                             FROM DOCUMENTOS.docestados ECMP
+                            WHERE ECMP.documento = DB.id
+                              AND ECMP.tipoestado = 'CMP') THEN
+                      'SI'
+                     ELSE
+                      'NO'
+                   END esConformado,
+                   --NVL2(EVIS.documento, 'SI', 'NO') esVisado,
+                   DTM.viaje viaje
+              FROM (SELECT id,
+                           numeroexterno,
+                           idemisor,
+                           emisor,
+                           tipodocumento,
+                           fechacreacion
+                      FROM DOCUMENTOS.docdocumentobase
+                     WHERE tipodocumento = 'MFTOC'
+                       AND activo = 'S'
+                       AND numeroexterno = :nroManifiesto
+                    UNION
+                    SELECT id,
+                           numeroexterno,
+                           idemisor,
+                           emisor,
+                           tipodocumento,
+                           fechacreacion
+                      FROM DOCUMENTOS.docdocumentobase
+                     WHERE tipodocumento = 'MFTOC'
+                       AND activo = 'S'
+                       AND NVL(:nroManifiesto, '0') = '0'
+                       AND fechaversion BETWEEN TO_DATE(:fechaDesde, '${ORACLE_DATE_FORMAT}') AND 
+                           CASE WHEN :fechaHasta IS NOT NULL THEN TO_DATE(:fechaHasta, '${ORACLE_DATE_FORMAT}') + 0.99999 ELSE SYSDATE END
+                       AND (NVL(:idEmisor, 0) = 0 OR idemisor = :idEmisor)
+                        
+                    ) DB
+              LEFT JOIN DOCUMENTOS.docrelaciondocumento RD
+                ON (RD.tiporelacion = 'REF' AND RD.activo = 'S' AND
+                   RD.docdestino = DB.id)
+              LEFT JOIN DOCUMENTOS.docdocumentobase DBG
+                ON (DBG.id = RD.docorigen)
+              LEFT JOIN DOCTRANSPORTE.doctrandoctransporte DT
+                ON (DT.id = DBG.id)
+              LEFT JOIN DOCUMENTOS.docestados DANU
+                ON (DANU.documento = DB.id AND
+                   DANU.TIPODOCUMENTO = DB.TIPODOCUMENTO AND
+                   DANU.tipoestado = 'ANU')
+            --LEFT JOIN DOCUMENTOS.docestados EVIS ON (EVIS.documento = DB.id AND EVIS.TIPODOCUMENTO = DB.TIPODOCUMENTO AND EVIS.tipoestado = 'VIS')
+              LEFT JOIN DOCTRANSPORTE.DOCTRANMANIFIESTO DTM
+                ON (DTM.id = DB.id)
+              LEFT JOIN DOCUMENTOS.doclocaciondocumento DLE
+                ON (DLE.documento = DB.id AND DLE.activa = 'S' AND
+                   DLE.tipolocacion = 'PE')
+              LEFT JOIN DOCUMENTOS.doclocaciondocumento DLD
+                ON (DLD.documento = DB.id AND DLD.activa = 'S' AND
+                   DLD.tipolocacion = 'PD')
+              LEFT JOIN DOCUMENTOS.docestados GANU
+                ON (GANU.documento = DBG.id AND
+                   GANU.TIPODOCUMENTO = DBG.TIPODOCUMENTO AND
+                   GANU.tipoestado = 'ANU')
+             WHERE DANU.documento IS NULL
+               AND (DBG.TIPODOCUMENTO IS NULL OR
+                   (DBG.TIPODOCUMENTO = 'GTIME' AND DBG.activo = 'S'))
+             GROUP BY DB.id,
+                      DB.numeroexterno,
+                      DB.emisor,
+                      DB.idemisor,
+                      DTM.numeroreferenciaoriginal,
+                      DB.fechacreacion,
+                      DLE.locacion,
+                      DLD.locacion,
+                      --EVIS.documento,
+                      DTM.viaje) MFTOC
+      LEFT JOIN DOCUMENTOS.DOCIMAGEN DI
+        ON (DI.documento = MFTOC.id)
+     WHERE (NVL(:nroManifiesto, '0') = '0' OR MFTOC.numeroexterno = :nroManifiesto)
+       AND (NVL(:idEmisor, 0) = 0 OR MFTOC.idemisor = :idEmisor)
+     ORDER BY MFTOC.numeroexterno
+      `;
+
+      this.logger.log(`📝 Ejecutando query completa equivalente a Fisc_ConsultaMFTOC`);
+
+      const result = await connection.execute(query, {
+        nroManifiesto: nroManifiesto || '0',
+        idEmisor: idEmisor || 0,
+        fechaDesde: v_fechadesde,
+        fechaHasta: v_fechahasta
+      });
+
+      const processedRows = [];
+
+      for (const row of result.rows) {
+        const rowData = {};
+        result.metaData.forEach((col, index) => {
+          rowData[col.name] = row[index];
+        });
+        processedRows.push(rowData);
+      }
+
+      this.logger.log(`✅ Consulta MFTOC completa exitosa: ${processedRows.length} registros`);
+
+      return processedRows;
+
+    } catch (error) {
+      this.logger.error('❌ Error en consultaMFTOCCompleta:', error);
+      throw error;
+    } finally {
+      try {
+        if (connection) {
+          await connection.close();
+          this.logger.log('✅ Conexión cerrada en consultaMFTOCCompleta');
         }
       } catch (closeError) {
         this.logger.warn('⚠️ Error cerrando conexión:', closeError);

@@ -43,6 +43,20 @@ export class ManifiestoService {
     );
   }
 
+  async consultaMFTOC(consultaDto: ConsultaGtimeDto) {
+    return await this.oracleService.consultaMFTOC(
+      consultaDto.EdIdPersona,
+      consultaDto.EdFechaInicio,
+      consultaDto.EdFechaTermino,
+      consultaDto.EdVisado,
+      consultaDto.EdTipoViaTransporte,
+      consultaDto.EdNroManifiesto,
+      consultaDto.guiaCourier,
+      consultaDto.EdNombrePersona,
+      consultaDto.MRevisionMFTOC_pageCode
+    );
+  }
+
   async testBasicQuery(numeroExterno?: string) {
     return await this.oracleService.testBasicQuery(numeroExterno);
   }
