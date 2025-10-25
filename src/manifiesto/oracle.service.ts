@@ -161,24 +161,24 @@ export class OracleService {
   ) {
     try {
       this.logger.log('🔍 Usando consulta completa equivalente a Fisc_ConsultaMFTOC_GTIME');
-
-      // Usar el nuevo método completo que replica la función del PKB
-      const result = await this.consultaMftocGTIMECompleta(
-        fechaInicio,
-        fechaTermino,
-        nroManifiesto,
-        emisor,
-        nroGuia,
-        visado,
-        tipoCourier,
-        nombrePersona,
-        pageCode
-      );
-
+      let result: any[] = [];
+      const filteredRows = [];
       this.logger.log(`📊 Registros obtenidos de Oracle: ${result.length}`);
 
       // Si hay número de manifiesto específico, devolver directamente sin filtros adicionales
       if (nroManifiesto && nroManifiesto.trim() !== '') {
+        // Usar el nuevo método completo que replica la función del PKB
+        result = await this.consultaMftocGTIMECompleta(
+          fechaInicio,
+          fechaTermino,
+          nroManifiesto,
+          emisor,
+          nroGuia,
+          visado,
+          tipoCourier,
+          nombrePersona,
+          pageCode
+        );
         this.logger.log('📋 Búsqueda por número de manifiesto específico - sin filtros adicionales');
         const processedRows = [];
 
@@ -196,39 +196,38 @@ export class OracleService {
 
         this.logger.log(`✅ Procesamiento directo completado: ${processedRows.length} registros finales`);
         return processedRows;
-      }
+      } else {
+        // Solo aplicar filtros cuando se busca por fechas
 
-      // Solo aplicar filtros cuando se busca por fechas
-      const filteredRows = [];
+        for (const row of result) {
+          const estaConformado = this.nvl((row as any).esConformado || 'NO');
+          const estaVisado = this.nvl((row as any).esVisado || 'PEND');
+          const madrereferenciada = (row as any).madrereferenciada;
+          const micreferenciado = (row as any).micreferenciado;
+          const crtreferenciado = (row as any).crtreferenciado;
 
-      for (const row of result) {
-        const estaConformado = this.nvl((row as any).esConformado || 'NO');
-        const estaVisado = this.nvl((row as any).esVisado || 'PEND');
-        const madrereferenciada = (row as any).madrereferenciada;
-        const micreferenciado = (row as any).micreferenciado;
-        const crtreferenciado = (row as any).crtreferenciado;
+          // Aplicar filtros según el tipo de courier
+          if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
+            (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
+            continue;
+          }
 
-        // Aplicar filtros según el tipo de courier
-        if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
-          (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
-          continue;
-        }
+          // Aplicar filtros según el estado de visado
+          if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
+            (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
+            (estaVisado === VISADO_SI && visado === VISADO_SI) ||
+            visado === TODOS_VISADO) {
 
-        // Aplicar filtros según el estado de visado
-        if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
-          (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
-          (estaVisado === VISADO_SI && visado === VISADO_SI) ||
-          visado === TODOS_VISADO) {
-
-          const processedRow = this.mapConsultaMFTOCDirect(
-            row,
-            estaVisado,
-            estaConformado,
-            madrereferenciada,
-            micreferenciado,
-            crtreferenciado
-          );
-          filteredRows.push(processedRow);
+            const processedRow = this.mapConsultaMFTOCDirect(
+              row,
+              estaVisado,
+              estaConformado,
+              madrereferenciada,
+              micreferenciado,
+              crtreferenciado
+            );
+            filteredRows.push(processedRow);
+          }
         }
       }
 
