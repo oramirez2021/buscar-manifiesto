@@ -90,4 +90,7 @@ export class GuiaManifiestoResponseDto {
 
     @ApiProperty({ description: 'Propuesta (vacía sin clasificación fiscal)', example: '' })
     propuesta: string;
+
+    @ApiPropertyOptional({ description: 'Datos PDF en formato JSON', example: {} })
+    pdfData?: any;
 }

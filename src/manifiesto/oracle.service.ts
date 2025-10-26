@@ -372,6 +372,40 @@ export class OracleService {
     }
   }
 
+  async obtenerXmlDocumentoPorId(idDocumento: number): Promise<any> {
+    const connection = await this.getConnection();
+    try {
+      this.logger.log(`🔍 Obteniendo XML para documento ID: ${idDocumento}`);
+
+      const query = `
+        SELECT xml 
+        FROM documentos.docimagen 
+        WHERE documento = :idDocumento
+      `;
+
+      const result = await connection.execute(query, {
+        idDocumento: idDocumento
+      });
+
+      if (result.rows && result.rows.length > 0) {
+        const xmlData = result.rows[0][0];
+        this.logger.log(`✅ XML encontrado para documento: ${idDocumento}`);
+        return xmlData;
+      }
+
+      this.logger.log(`❌ No se encontró XML para documento: ${idDocumento}`);
+      return null;
+
+    } catch (error) {
+      this.logger.error('❌ Error obteniendo XML:', error);
+      throw error;
+    } finally {
+      if (connection) {
+        await connection.close();
+      }
+    }
+  }
+
 
   private convertToOracleDate(dateString: string): string {
     if (!dateString) {
