@@ -1070,4 +1070,225 @@ export class OracleService {
     }
   }
 
+  async consultaGuiasPorManifiesto(
+    idManifiesto: number,
+    nroGuia?: string
+  ): Promise<any[]> {
+    const connection = await this.getConnection();
+    const v_idmanifiesto = '19053908';
+    const v_nrogGuia = nroGuia || null;
+    try {
+      this.logger.log(`🔍 Consultando guías para manifiesto ID: ${idManifiesto}`);
+
+      const query = `
+        WITH suma_agg AS (
+          SELECT R.DOCDESTINO,
+                 DP.NUMEROID,
+                 SUM(CASE
+                       WHEN DT.VALORDECLARADO <= 500 THEN
+                        DT.VALORDECLARADO
+                       ELSE
+                        0
+                     END) AS suma_valordeclarado,
+                 COUNT(CASE
+                         WHEN DT.VALORDECLARADO > 500 THEN
+                          1
+                         ELSE
+                          NULL
+                       END) AS cant_gtimes_sobre_tope
+            FROM DOCTRANSPORTE.DOCTRANDOCTRANSPORTE DT
+            JOIN DOCUMENTOS.DOCDOCUMENTOBASE DB
+              ON DB.ID = DT.ID
+            JOIN DOCUMENTOS.DOCPARTICIPACION DP
+              ON DP.DOCUMENTO = DB.ID
+            JOIN DOCUMENTOS.DOCRELACIONDOCUMENTO R
+              ON R.DOCORIGEN = DB.ID
+           WHERE DB.ACTIVO = 'S'
+             AND DB.TIPODOCUMENTO = 'GTIME'
+             AND R.TIPORELACION = 'REF'
+             AND R.ACTIVO = 'S'
+             AND DP.ROL = 'CONS'
+             AND NOT EXISTS (
+               SELECT 1
+                 FROM DOCUMENTOS.DOCESTADOS DE
+                WHERE DE.DOCUMENTO = DB.ID
+                  AND DE.TIPOESTADO = 'ANU'
+                  AND DE.ACTIVA = 'S'
+             )
+             AND DB.ID IN (
+               SELECT DOCUMENTO
+                 FROM DOCUMENTOS.DOCOBSERVACION O
+                WHERE O.DOCUMENTO = DB.ID
+                  AND O.TIPOOBSERVACION = 'C2C'
+             )
+           GROUP BY R.DOCDESTINO, DP.NUMEROID
+        )
+        SELECT r.tiporelacion,
+               r.docorigen,
+               r.id,
+               r.observacion,
+               r.fecha AS fecharelacion,
+               docbase.tipodocumento,
+               docbase.numeroexterno AS numerodoc,
+               docbase.idemisor AS emisor,
+               docbase.emisor AS nombreemisor,
+               docbase.fechaemision,
+               docbase.id AS iddocdestino,
+               docbase.fechacreacion AS fechaactiva,
+               docbase.version,
+               dtran.sentido AS sentidooperacion,
+               NVL2(est_vis.tipoestado, 'SI', 'NO') AS esrevisado,
+               NVL2(est_conm.tipoestado, 'SI', 'NO') AS esmarcado,
+               NVL2(fis.CodigoOpFiscMotivoMarca, 'SI', 'NO') AS tienemarcaFisica,
+               dp.consignante,
+               dp.rutconsignatario,
+               dp.consignatario,
+               courier_consultas.gtime_getproductosasstring(docbase.id) productos,
+               courier_consultas.gtime_getmarcasasstring(docbase.id) marcas,
+               courier_consultas.gtime_getvistosbuenos(docbase.id) vistosbuenos,
+               courier_consultas.gtime_gettransbordos(docbase.id) transbordos,
+               courier_consultas.gtime_getestado(docbase.id) estadoactual,
+               courier_consultas.gtime_geMotivoSeleccion(docbase.id) motivoseleccion,
+               dtran.totalbultos,
+               dtran.totalpeso,
+               dtran.valordeclarado,
+               courier_consultas.gtime_getObservacion(docbase.id) observaciones,
+               courier_consultas.getResultadoFiscalizacion(docbase.id) resultado,
+               (CASE
+                 WHEN dp.RUTconsignatario = '99999999-9' THEN 'rutBuzon'
+                 WHEN documentos.courier_consultas.validarRutEmbajada(dp.RUTconsignatario) ='RUTS_EMBAJADAS' THEN 'rutEmbajada'
+                 WHEN documentos.courier_consultas.esRutEmpresa(dp.RUTconsignatario) = 1 THEN 'rutEmpresa'
+                 ELSE ''
+               END) AS TIPO_RUT_CONS,
+               sa.suma_valordeclarado AS SUMA_VALOR_X_CONSIG,
+               sa.cant_gtimes_sobre_tope AS CANT_GTIMES_SOBRE_TOPE,
+               denunciastta.denuncia_courier.contar_denuncias_x_rut(dp.RUTconsignatario) cant_denuncias,
+               (SELECT NUMEROID
+                  FROM docparticipacion
+                 WHERE documento = docbase.id
+                   AND rol = 'PLVEN') plven,
+               (SELECT OBS.OBSERVACION
+                  FROM documentos.docobservacion obs
+                 WHERE docbase.tipodocumento = obs.tipodocumento
+                   AND docbase.id = obs.documento
+                   AND obs.tipoobservacion = 'IVA-COB'
+                   AND ROWNUM = 1) ivacob,
+               (SELECT OBS.OBSERVACION
+                  FROM documentos.docobservacion obs
+                 WHERE docbase.tipodocumento = obs.tipodocumento
+                   AND docbase.id = obs.documento
+                   AND obs.tipoobservacion = 'C2C'
+                   AND ROWNUM = 1) c2c,
+               (SELECT OBS.OBSERVACION
+                  FROM documentos.docobservacion obs
+                 WHERE docbase.tipodocumento = obs.tipodocumento
+                   AND docbase.id = obs.documento
+                   AND obs.tipoobservacion = 'NOREG'
+                   AND ROWNUM = 1) noreg,
+               (SELECT documentos.util_consultas.fget_esPlataformaVigente(NUMEROID,to_char(sysdate,'dd-mm-yyyy'))
+                  FROM docparticipacion
+                 WHERE documento = docbase.id
+                   AND rol = 'PLVEN') platvigente
+          FROM documentos.docrelaciondocumento r
+          JOIN documentos.docdocumentobase docbase
+            ON docbase.id = r.docorigen
+          JOIN doctrandoctransporte dtran
+            ON dtran.id = docbase.id
+          LEFT JOIN docestados est_vis
+            ON est_vis.documento = docbase.id
+           AND est_vis.tipoestado = 'VIS'
+           AND est_vis.activa = 'S'
+          LEFT JOIN docestados est_conm
+            ON est_conm.documento = docbase.id
+           AND est_conm.tipoestado = 'CON MARCA'
+           AND est_conm.activa = 'S'
+          LEFT JOIN fiscalizaciones.OpFiscMarca fis
+            ON fis.IdDocumento = docbase.id
+           AND fis.CodigoOpFiscMotivoMarca IN ('ANMANI','D','E','F','G','O','R','SEREMI','ISP','DGMN','SERNAPESCA','DF','PARTIDA')
+          LEFT JOIN (SELECT documento,
+                            MAX(CASE WHEN rol = 'CNTE' THEN nombreparticipante END) AS consignante,
+                            MAX(CASE WHEN rol = 'CONS' THEN nombreparticipante END) AS consignatario,
+                            MAX(CASE WHEN rol = 'CONS' THEN NUMEROID END) AS rutconsignatario
+                       FROM docparticipacion
+                      GROUP BY documento) dp
+            ON dp.documento = docbase.id
+          LEFT JOIN suma_agg sa
+            ON sa.DOCDESTINO = r.DOCDESTINO
+           AND sa.NUMEROID = dp.rutconsignatario
+         WHERE r.tiporelacion = 'REF'
+           AND r.activo = 'S'
+           AND r.docdestino = :idmanifiesto
+           AND docbase.tipodocumento = 'GTIME'
+           AND docbase.activo = 'S'
+           AND (:p_nroGuia IS NULL OR docbase.numeroexterno = :p_nroGuia)
+           AND NOT EXISTS (
+             SELECT 1
+               FROM DOCUMENTOS.DOCESTADOS DE
+              WHERE DE.DOCUMENTO = docbase.ID
+                AND DE.TIPOESTADO = 'ANU'
+                AND DE.ACTIVA = 'S'
+           )
+         ORDER BY CASE
+                    WHEN dp.RUTconsignatario = '99999999-9' THEN 1
+                    WHEN dp.RUTconsignatario IS NULL OR dp.RUTconsignatario = '' THEN 2
+                    ELSE 0
+                  END,
+                  dp.RUTconsignatario
+      `;
+
+      const result = await connection.execute(query, {
+        idmanifiesto: v_idmanifiesto,
+        p_nroGuia: v_nrogGuia
+      });
+
+      return this.mapGuiasManifiestoDirect(result.rows);
+
+    } catch (error) {
+      this.logger.error('❌ Error in consultaGuiasPorManifiesto:', error);
+      throw error;
+    } finally {
+      if (connection) {
+        await connection.close();
+      }
+    }
+  }
+
+  private mapGuiasManifiestoDirect(rows: any[]): any[] {
+    return rows.map(row => {
+      const sentidoOperacion = this.nvl(row[13]);
+      const transito = sentidoOperacion === 'TR' ? 'SI' : 'NO';
+
+      return {
+        Oid: {
+          Id: row[2]
+        },
+        NumeroDoc: this.nvl(row[6]),
+        NombreEmisor: this.nvl(row[8]),
+        TotalBultos: Number(this.nvl(row[26])),
+        TotalPeso: Number(this.nvl(row[27])),
+        TotalValor: Number(this.nvl(row[28])),
+        Consignante: this.nvl(row[17]),
+        Consignatario: this.nvl(row[19]),
+        rutconsignatario: this.nvl(row[18]),
+        Productos: this.nvl(row[20]),
+        VistosBuenos: this.nvl(row[22]),
+        Transito: transito,
+        FechaCreacion: this.formatDateString(row[12]),
+        EstadoActual: this.nvl(row[24]),
+        Detalle: 'Ms Info.', // Exactamente como en el original
+        verPDF: `<img src="/WebFiscalizaciones/resources/images/crobat3.jpg" style="cursor:pointer;" width="20" height="20" onclick="javascript:getPDF('${row[2]}','1','GTIME');return false;" >`,
+        // Campos exactos del original WebFiscalizaciones
+        Numero: this.nvl(row[6]), // Duplicado de NumeroDoc
+        TipoDoc: 'GUIA TIME',
+        CodigoTipoDoc: this.nvl(row[7]), // tipoDocumento
+        cantidadDenuncias: Number(this.nvl(row[34])),
+        Transbordos: this.nvl(row[23]),
+        MotivoSeleccion: this.nvl(row[25]),
+        tipoRutConsignatario: this.nvl(row[31]),
+        // Propuesta vacía sin clasificación fiscal
+        propuesta: ''
+      };
+    });
+  }
+
 }

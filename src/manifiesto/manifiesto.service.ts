@@ -5,6 +5,7 @@ import { CreateManifiestoDto } from './dto/create-manifiesto.dto';
 import { UpdateManifiestoDto } from './dto/update-manifiesto.dto';
 import { BuscarManifiestoDto } from './dto/buscar-manifiesto.dto';
 import { ConsultaGtimeDto } from './dto/consulta-gtime.dto';
+import { ConsultaGuiasManifiestoDto } from './dto/consulta-guias-manifiesto.dto';
 import { OracleService } from './oracle.service';
 import { ManifiestoEntity } from './entities/manifiesto.entity';
 
@@ -56,5 +57,12 @@ export class ManifiestoService {
       console.error('Error en gtimeGetMarcasAsString:', error);
       throw error;
     }
+  }
+
+  async consultaGuiasPorManifiesto(consultaDto: ConsultaGuiasManifiestoDto) {
+    return await this.oracleService.consultaGuiasPorManifiesto(
+      consultaDto.idManifiesto,
+      consultaDto.nroGuia
+    );
   }
 }

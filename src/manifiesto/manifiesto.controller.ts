@@ -13,6 +13,8 @@ import { Public } from '../auth/public.decorator';
 import { Roles } from '../auth/roles.decorator';
 import { ManifiestoService } from './manifiesto.service';
 import { ConsultaGtimeDto } from './dto/consulta-gtime.dto';
+import { ConsultaGuiasManifiestoDto } from './dto/consulta-guias-manifiesto.dto';
+import { GuiaManifiestoResponseDto } from './dto/guia-manifiesto-response.dto';
 import { ManifiestoGtimeResponseDto } from './dto/manifiesto-gtime-response.dto';
 
 @ApiTags('manifiestos')
@@ -103,6 +105,37 @@ export class ManifiestoController {
     } catch (error) {
       console.error('❌ Error en getMarcas:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  @Public()
+  @Get('guias-por-manifiesto')
+  @ApiOperation({
+    summary: 'Consulta guías asociadas a un manifiesto específico',
+    description: 'Replica la funcionalidad de MDetalleDocumento.jsp para obtener guías GTIME asociadas a un manifiesto'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de guías encontradas para el manifiesto.',
+    type: [GuiaManifiestoResponseDto]
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Parámetros de entrada inválidos'
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Error interno del servidor al consultar Oracle'
+  })
+  async consultaGuiasPorManifiesto(@Query() consultaDto: ConsultaGuiasManifiestoDto) {
+    try {
+      console.log('🔍 Consulta guías por manifiesto:', consultaDto);
+      const result = await this.manifiestoService.consultaGuiasPorManifiesto(consultaDto);
+      console.log('✅ Guías encontradas:', result.length, 'registros');
+      return result;
+    } catch (error) {
+      console.error('❌ Error en consultaGuiasPorManifiesto:', error);
+      throw error;
     }
   }
 }
