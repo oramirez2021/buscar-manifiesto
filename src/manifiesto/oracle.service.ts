@@ -336,6 +336,42 @@ export class OracleService {
     return value || '';
   }
 
+  async obtenerIdManifiestoPorNumero(numeroManifiesto: string): Promise<number | null> {
+    const connection = await this.getConnection();
+    try {
+      this.logger.log(`🔍 Obteniendo ID de manifiesto para número: ${numeroManifiesto}`);
+
+      const query = `
+        SELECT id 
+        FROM documentos.DOCDOCUMENTOBASE 
+        WHERE tipodocumento = 'MFTOC' 
+          AND activo = 'S' 
+          AND numeroexterno = :numeroManifiesto
+      `;
+
+      const result = await connection.execute(query, {
+        numeroManifiesto: numeroManifiesto
+      });
+
+      if (result.rows && result.rows.length > 0) {
+        const idManifiesto = Number(result.rows[0][0]);
+        this.logger.log(`✅ ID de manifiesto encontrado: ${idManifiesto}`);
+        return idManifiesto;
+      }
+
+      this.logger.log(`❌ No se encontró manifiesto con número: ${numeroManifiesto}`);
+      return null;
+
+    } catch (error) {
+      this.logger.error('❌ Error obteniendo ID de manifiesto:', error);
+      throw error;
+    } finally {
+      if (connection) {
+        await connection.close();
+      }
+    }
+  }
+
 
   private convertToOracleDate(dateString: string): string {
     if (!dateString) {
@@ -1071,14 +1107,14 @@ export class OracleService {
   }
 
   async consultaGuiasPorManifiesto(
-    idManifiesto: number,
+    numeroManifiesto: number,
     nroGuia?: string
   ): Promise<any[]> {
     const connection = await this.getConnection();
-    const v_idmanifiesto = '18912825';
+    const v_idmanifiesto = await this.obtenerIdManifiestoPorNumero(numeroManifiesto.toString());
     const v_nrogGuia = nroGuia || null;
     try {
-      this.logger.log(`🔍 Consultando guías para manifiesto ID: ${idManifiesto}`);
+      this.logger.log(`🔍 Consultando guías para manifiesto ID: ${v_idmanifiesto}`);
 
       const query = `
         WITH suma_agg AS (

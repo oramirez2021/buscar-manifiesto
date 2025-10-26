@@ -61,7 +61,7 @@ export class ManifiestoService {
 
   async consultaGuiasPorManifiesto(consultaDto: ConsultaGuiasManifiestoDto) {
     return await this.oracleService.consultaGuiasPorManifiesto(
-      consultaDto.idManifiesto,
+      consultaDto.numeroManifiesto,
       consultaDto.nroGuia
     );
   }

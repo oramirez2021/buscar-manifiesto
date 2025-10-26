@@ -4,14 +4,14 @@ import { Transform } from 'class-transformer';
 
 export class ConsultaGuiasManifiestoDto {
     @ApiProperty({
-        description: 'ID del manifiesto',
+        description: 'Número del manifiesto',
         example: 12345,
         minimum: 1
     })
     @Transform(({ value }) => parseInt(value))
-    @IsNumber({}, { message: 'El ID del manifiesto debe ser un número' })
-    @Min(1, { message: 'El ID del manifiesto debe ser mayor a 0' })
-    idManifiesto: number;
+    @IsNumber({}, { message: 'El número del manifiesto debe ser un número' })
+    @Min(1, { message: 'El número del manifiesto debe ser mayor a 0' })
+    numeroManifiesto: number;
 
     @ApiPropertyOptional({
         description: 'Número de guía específica para filtrar',
