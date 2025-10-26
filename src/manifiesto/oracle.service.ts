@@ -372,39 +372,6 @@ export class OracleService {
     }
   }
 
-  async obtenerXmlDocumentoPorId(idDocumento: number): Promise<any> {
-    const connection = await this.getConnection();
-    try {
-      this.logger.log(`🔍 Obteniendo XML para documento ID: ${idDocumento}`);
-
-      const query = `
-        SELECT xml 
-        FROM documentos.docimagen 
-        WHERE documento = :idDocumento
-      `;
-
-      const result = await connection.execute(query, {
-        idDocumento: idDocumento
-      });
-
-      if (result.rows && result.rows.length > 0) {
-        const xmlData = result.rows[0][0];
-        this.logger.log(`✅ XML encontrado para documento: ${idDocumento}`);
-        return xmlData;
-      }
-
-      this.logger.log(`❌ No se encontró XML para documento: ${idDocumento}`);
-      return null;
-
-    } catch (error) {
-      this.logger.error('❌ Error obteniendo XML:', error);
-      throw error;
-    } finally {
-      if (connection) {
-        await connection.close();
-      }
-    }
-  }
 
 
   private convertToOracleDate(dateString: string): string {
@@ -1258,7 +1225,8 @@ export class OracleService {
                (SELECT documentos.util_consultas.fget_esPlataformaVigente(NUMEROID,to_char(sysdate,'dd-mm-yyyy'))
                   FROM docparticipacion
                  WHERE documento = docbase.id
-                   AND rol = 'PLVEN') platvigente
+                   AND rol = 'PLVEN') platvigente,
+                   di.xml AS pdfdata
           FROM documentos.docrelaciondocumento r
           JOIN documentos.docdocumentobase docbase
             ON docbase.id = r.docorigen
@@ -1285,6 +1253,7 @@ export class OracleService {
           LEFT JOIN suma_agg sa
             ON sa.DOCDESTINO = r.DOCDESTINO
            AND sa.NUMEROID = dp.rutconsignatario
+           LEFT JOIN DOCUMENTOS.docimagen di ON di.documento = r.docorigen AND ROWNUM = 1
          WHERE r.tiporelacion = 'REF'
            AND r.activo = 'S'
            AND r.docdestino = :idmanifiesto
@@ -1387,7 +1356,8 @@ export class OracleService {
         tipoRutConsignatario: this.nvl(row[31]),
         ivacob: this.nvl(row[35]), // Observación IVA-COB
         // Propuesta vacía sin clasificación fiscal
-        propuesta: ''
+        propuesta: '',
+        pdfData: this.nvl(row[40]) // XML del documento
       };
     });
   }
