@@ -1354,6 +1354,8 @@ export class OracleService {
         Transbordos: this.nvl(row[23]),
         MotivoSeleccion: this.nvl(row[25]),
         tipoRutConsignatario: this.nvl(row[31]),
+        sumaValores: Number(this.nvl(row[32])), // SUMA_VALOR_X_CONSIG
+        sobreTopePorRut: Number(this.nvl(row[33])), // CANT_GTIMES_SOBRE_TOPE
         ivacob: this.nvl(row[35]), // Observación IVA-COB
         // Propuesta vacía sin clasificación fiscal
         propuesta: '',

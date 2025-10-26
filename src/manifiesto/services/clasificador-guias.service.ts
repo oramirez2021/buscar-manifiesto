@@ -1,18 +1,25 @@
 import { Injectable } from '@nestjs/common';
-import { IndicadorDto } from '../dto/indicador.dto';
+import { ClasificacionResult } from '../dto/clasificacion-result.dto';
 
 @Injectable()
 export class ClasificadorGuiasService {
-    private readonly topeMaximo_Fiscalizable = 41.0;
+    private static readonly topeMaximo_Fiscalizable = 41.0;
 
-    clasificarGuia(
+    static clasificarGuia(
         guia: any,
         sumaValores: number,
         sobreTopePorRut: number,
         rutconsignatario: string
-    ): IndicadorDto {
+    ): ClasificacionResult {
         const tipoRutConsignatario = guia.tipoRutConsignatario;
-        const indicadorColor = new IndicadorDto();
+        const indicadorColor: ClasificacionResult = {
+            rojo: '',
+            amarillo: '',
+            verde: '',
+            naranjo: '',
+            propuesta: '',
+            observacion: ''
+        };
         const valorLimite = this.topeMaximo_Fiscalizable;
 
         if (tipoRutConsignatario === 'rutEmbajada') {

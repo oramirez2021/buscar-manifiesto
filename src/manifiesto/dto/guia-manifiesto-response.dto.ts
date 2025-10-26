@@ -88,7 +88,7 @@ export class GuiaManifiestoResponseDto {
     @ApiProperty({ description: 'Observación IVA-COB', example: 'Observación de IVA' })
     ivacob: string;
 
-    @ApiProperty({ description: 'Propuesta (vacía sin clasificación fiscal)', example: '' })
+    @ApiProperty({ description: 'Clasificación fiscal con colores HTML + propuesta', example: '<span class="color-box verde" title="LIBRE"></span>LIBRE' })
     propuesta: string;
 
     @ApiPropertyOptional({ description: 'Datos PDF en formato JSON', example: {} })
