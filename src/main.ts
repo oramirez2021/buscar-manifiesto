@@ -34,13 +34,21 @@ async function bootstrap() {
 
   // Swagger (v4, compatible con Nest v7)
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Aduanas Service')
-    .setDescription('Microservicio NestJS con TypeORM, JWT y Swagger')
+    .setTitle('Buscar Manifiesto Service')
+    .setDescription('Microservicio para consulta de manifiestos y guías GTIME desde Oracle')
     .setVersion('1.0.0')
     .addBearerAuth()
     .build();
-  const swaggerDoc = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, swaggerDoc);
+  const swaggerDoc = SwaggerModule.createDocument(app, swaggerConfig, {
+    deepScanRoutes: true,
+  });
+  SwaggerModule.setup('api/docs', app, swaggerDoc, {
+    swaggerOptions: {
+      docExpansion: 'full',
+      showRequestHeaders: true,
+      showCommonExtensions: true,
+    },
+  });
 
   // Health
   app.use('/api/health', (req: any, res: any) => {

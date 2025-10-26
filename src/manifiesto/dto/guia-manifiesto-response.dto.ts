@@ -1,10 +1,17 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+/**
+ * DTO para identificador de documento
+ */
 export class OidDto {
     @ApiProperty({ description: 'ID del documento', example: 12345 })
     Id: number;
 }
 
+/**
+ * DTO para respuesta de guías GTIME asociadas a un manifiesto
+ * Contiene información detallada de cada guía individual como emisor, consignatario, productos, peso, valor, etc.
+ */
 export class GuiaManifiestoResponseDto {
     @ApiProperty({ description: 'Identificador del documento', type: OidDto })
     Oid: OidDto;
@@ -36,13 +43,16 @@ export class GuiaManifiestoResponseDto {
     @ApiProperty({ description: 'Productos', example: 'Ropa, Electrónicos' })
     Productos: string;
 
+    @ApiProperty({ description: 'Marcas del documento - representa id envio', example: 'Marca1, Marca2' })
+    marcas: string;
+
     @ApiProperty({ description: 'Vistos buenos', example: 'SI/NO' })
     VistosBuenos: string;
 
     @ApiProperty({ description: 'Es tránsito', example: 'SI/NO' })
     Transito: string;
 
-    @ApiProperty({ description: 'Fecha de creación', example: '2024-01-15 10:30:00' })
+    @ApiProperty({ description: 'Fecha de creación (fechaactiva del query)', example: '2024-01-15 10:30:00' })
     FechaCreacion: string;
 
     @ApiProperty({ description: 'Estado actual', example: 'ACTIVO' })
@@ -63,7 +73,7 @@ export class GuiaManifiestoResponseDto {
     @ApiProperty({ description: 'Código tipo documento', example: 'GTIME' })
     CodigoTipoDoc: string;
 
-    @ApiProperty({ description: 'Cantidad de denuncias', example: 0 })
+    @ApiProperty({ description: 'Cantidad de denuncias (cant_denuncias del query)', example: 0 })
     cantidadDenuncias: number;
 
     @ApiProperty({ description: 'Transbordos', example: 'Transbordo aéreo' })
@@ -74,6 +84,9 @@ export class GuiaManifiestoResponseDto {
 
     @ApiProperty({ description: 'Tipo RUT consignatario', example: 'rutEmbajada' })
     tipoRutConsignatario: string;
+
+    @ApiProperty({ description: 'Observación IVA-COB', example: 'Observación de IVA' })
+    ivacob: string;
 
     @ApiProperty({ description: 'Propuesta (vacía sin clasificación fiscal)', example: '' })
     propuesta: string;

@@ -1,5 +1,9 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+/**
+ * DTO para respuesta de manifiestos GTIME
+ * Contiene información básica de manifiestos como número, fecha, estado, transportista, etc.
+ */
 export class ManifiestoGtimeResponseDto {
   @ApiProperty({ description: 'ID del manifiesto' })
   id!: number;

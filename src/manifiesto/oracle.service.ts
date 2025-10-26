@@ -1300,9 +1300,10 @@ export class OracleService {
         Consignatario: this.nvl(row[19]),
         rutconsignatario: this.nvl(row[18]),
         Productos: this.nvl(row[20]),
+        marcas: this.nvl(row[21]), // gtime_getmarcasasstring(docbase.id)
         VistosBuenos: this.nvl(row[22]),
         Transito: transito,
-        FechaCreacion: this.formatDateString(row[12]),
+        FechaCreacion: this.formatDateString(row[11]), // fechaactiva del query
         EstadoActual: this.nvl(row[24]) || '', // Normaliza null a string vacío (línea 550 del DAO)
         Detalle: 'Ms Info.', // Exactamente como en el original
         verPDF: `<img src="/WebFiscalizaciones/resources/images/crobat3.jpg" style="cursor:pointer;" width="20" height="20" onclick="javascript:getPDF('${row[2]}','1','GTIME');return false;" >`,
@@ -1310,10 +1311,11 @@ export class OracleService {
         Numero: this.nvl(row[6]), // Duplicado de NumeroDoc
         TipoDoc: 'GUIA TIME',
         CodigoTipoDoc: this.nvl(row[7]), // tipoDocumento
-        cantidadDenuncias: Number(this.nvl(row[34])),
+        cantidadDenuncias: Number(this.nvl(row[34])), // cant_denuncias del query
         Transbordos: this.nvl(row[23]),
         MotivoSeleccion: this.nvl(row[25]),
         tipoRutConsignatario: this.nvl(row[31]),
+        ivacob: this.nvl(row[35]), // Observación IVA-COB
         // Propuesta vacía sin clasificación fiscal
         propuesta: ''
       };

@@ -35,13 +35,23 @@ export class ManifiestoController {
 
   @Public()
   @Get('consulta-gtime')
-  @ApiOperation({ summary: 'Consulta manifiestos GTIME desde Oracle' })
+  @ApiOperation({
+    summary: 'Consulta manifiestos GTIME desde Oracle',
+    description: 'Endpoint que consulta manifiestos GTIME desde la base de datos Oracle. Si se proporciona un número de manifiesto específico, usa consultaMftocGTIME. Si no, usa consultaMFTOC con filtros de fecha. Devuelve información básica de manifiestos (no guías individuales).'
+  })
   @ApiResponse({
     status: 200,
-    description: 'Lista de manifiestos GTIME encontrados.',
+    description: 'Lista de manifiestos GTIME encontrados. Cada manifiesto contiene información básica como número, fecha, estado, transportista, etc.',
     type: [ManifiestoGtimeResponseDto]
   })
-  @ApiResponse({ status: 500, description: 'Error en la consulta a Oracle.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Parámetros de entrada inválidos o malformados.'
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Error interno del servidor al consultar Oracle.'
+  })
   async consultaGtime(@Query() consultaDto: ConsultaGtimeDto) {
     try {
       console.log('🔍 Consulta recibida:', consultaDto);
@@ -72,20 +82,30 @@ export class ManifiestoController {
 
   @Public()
   @Get('marcas')
-  @ApiOperation({ summary: 'Obtener marcas de un documento GTIME usando gtime_getmarcasasstring' })
+  @ApiOperation({
+    summary: 'Obtener marcas de un documento GTIME',
+    description: 'Endpoint que obtiene las marcas asociadas a un documento GTIME específico usando la función Oracle gtime_getmarcasasstring.'
+  })
   @ApiResponse({
     status: 200,
     description: 'Marcas obtenidas exitosamente.',
     schema: {
       type: 'object',
       properties: {
-        success: { type: 'boolean' },
-        idgtime: { type: 'number' },
-        marcas: { type: 'string' }
+        success: { type: 'boolean', example: true },
+        idgtime: { type: 'number', example: 12345 },
+        marcas: { type: 'string', example: 'Marca1, Marca2, Marca3' }
       }
     }
   })
-  @ApiResponse({ status: 500, description: 'Error al obtener las marcas.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Parámetro idgtime inválido o faltante.'
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Error interno del servidor al consultar Oracle.'
+  })
   async getMarcas(@Query('idgtime') idgtime: string) {
     try {
       const idgtimeNumber = parseInt(idgtime);
@@ -112,11 +132,11 @@ export class ManifiestoController {
   @Get('guias-por-manifiesto')
   @ApiOperation({
     summary: 'Consulta guías asociadas a un manifiesto específico',
-    description: 'Replica la funcionalidad de MDetalleDocumento.jsp para obtener guías GTIME asociadas a un manifiesto'
+    description: 'Replica la funcionalidad de MDetalleDocumento.jsp para obtener guías GTIME asociadas a un manifiesto. Devuelve información detallada de cada guía individual (no información del manifiesto).'
   })
   @ApiResponse({
     status: 200,
-    description: 'Lista de guías encontradas para el manifiesto.',
+    description: 'Lista de guías GTIME asociadas al manifiesto. Cada guía contiene detalles como número de documento, emisor, consignatario, productos, peso, valor declarado, etc.',
     type: [GuiaManifiestoResponseDto]
   })
   @ApiResponse({
