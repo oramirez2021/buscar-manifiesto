@@ -19,7 +19,6 @@ export class ConsultaGuiasManifiestoDto {
         maxLength: 50
     })
     @IsOptional()
-    @Transform(({ value }) => (value === '' ? undefined : value))
     @IsString({ message: 'El número de guía debe ser una cadena de texto' })
     @Max(50, { message: 'El número de guía no puede exceder 50 caracteres' })
     nroGuia?: string;

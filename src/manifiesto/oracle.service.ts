@@ -1075,7 +1075,7 @@ export class OracleService {
     nroGuia?: string
   ): Promise<any[]> {
     const connection = await this.getConnection();
-    const v_idmanifiesto = '19053908';
+    const v_idmanifiesto = '18912825';
     const v_nrogGuia = nroGuia || null;
     try {
       this.logger.log(`🔍 Consultando guías para manifiesto ID: ${idManifiesto}`);
@@ -1241,7 +1241,13 @@ export class OracleService {
         p_nroGuia: v_nrogGuia
       });
 
-      return this.mapGuiasManifiestoDirect(result.rows);
+      this.logger.log(`📊 Registros devueltos por Oracle: ${result.rows.length}`);
+
+      const filteredRows = this.mapGuiasManifiestoDirect(result.rows);
+
+      this.logger.log(`✅ Registros después de filtros: ${filteredRows.length}`);
+
+      return filteredRows;
 
     } catch (error) {
       this.logger.error('❌ Error in consultaGuiasPorManifiesto:', error);
@@ -1254,7 +1260,30 @@ export class OracleService {
   }
 
   private mapGuiasManifiestoDirect(rows: any[]): any[] {
-    return rows.map(row => {
+    const topeMaximo_Fiscalizable = 41.0; // Línea 36 del DAO original
+
+    const filteredRows = rows.filter(row => {
+      // Extraer valores para filtros (líneas 552-558 del DAO original)
+      const valorDeclarado = Number(this.nvl(row[28])); // valordeclarado
+      const esRevisado = this.nvl(row[14]); // esrevisado ('SI' o 'NO')
+      const esMarcado = this.nvl(row[15]);  // esmarcado ('SI' o 'NO')
+
+      // FILTRO 1: Excluir si valorDeclarado > 41.0 (línea 552-554)
+      if (valorDeclarado > topeMaximo_Fiscalizable) {
+        return false;
+      }
+
+      // FILTRO 2: Excluir si esRevisado = 'SI' o esMarcado = 'SI' (línea 556-558)
+      if (esRevisado === 'SI' || esMarcado === 'SI') {
+        return false;
+      }
+
+      return true;
+    });
+
+    this.logger.log(`🔍 Registros filtrados: ${filteredRows.length} de ${rows.length}`);
+
+    return filteredRows.map(row => {
       const sentidoOperacion = this.nvl(row[13]);
       const transito = sentidoOperacion === 'TR' ? 'SI' : 'NO';
 
@@ -1274,7 +1303,7 @@ export class OracleService {
         VistosBuenos: this.nvl(row[22]),
         Transito: transito,
         FechaCreacion: this.formatDateString(row[12]),
-        EstadoActual: this.nvl(row[24]),
+        EstadoActual: this.nvl(row[24]) || '', // Normaliza null a string vacío (línea 550 del DAO)
         Detalle: 'Ms Info.', // Exactamente como en el original
         verPDF: `<img src="/WebFiscalizaciones/resources/images/crobat3.jpg" style="cursor:pointer;" width="20" height="20" onclick="javascript:getPDF('${row[2]}','1','GTIME');return false;" >`,
         // Campos exactos del original WebFiscalizaciones
