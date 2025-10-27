@@ -850,9 +850,7 @@ export class OracleService {
     idEmisor?: number,
     nroGuia?: string,
     visado?: string,
-    tipoCourier?: string,
-    nombrePersona?: string,
-    pageCode?: string
+    tipoCourier?: string
   ) {
 
     let connection;
@@ -866,6 +864,8 @@ export class OracleService {
 
       // Query equivalente a Fisc_ConsultaMFTOC sin XMLTYPE
       const query = `
+      --SELECT * FROM (
+      --SELECT a.*, ROWNUM rnum FROM (
         SELECT MFTOC.id,
            MFTOC.numeroexterno,
            MFTOC.emisor,
@@ -1030,6 +1030,8 @@ export class OracleService {
      WHERE (NVL(:nroManifiesto, '0') = '0' OR MFTOC.numeroexterno = :nroManifiesto)
        AND (NVL(:idEmisor, 0) = 0 OR MFTOC.idemisor = :idEmisor)
      ORDER BY MFTOC.numeroexterno
+  --) a WHERE ROWNUM <= :pagina * :porPagina
+--) WHERE rnum > (:pagina - 1) * :porPagina
       `;
 
       this.logger.log(`📝 Ejecutando query completa equivalente a Fisc_ConsultaMFTOC`);

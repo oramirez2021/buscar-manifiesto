@@ -19,8 +19,10 @@ import { ManifiestoService } from './manifiesto.service';
 import { ConsultaGtimeDto } from './dto/consulta-gtime.dto';
 import { ConsultaGuiasManifiestoDto } from './dto/consulta-guias-manifiesto.dto';
 import { GuiaManifiestoResponseDto } from './dto/guia-manifiesto-response.dto';
+import { GuiasManifiestoListResponseDto } from './dto/guias-manifiesto-list-response.dto';
 import { PdfGeneratorService } from './services/pdf-generator.service';
 import { ManifiestoGtimeResponseDto } from './dto/manifiesto-gtime-response.dto';
+import { ManifiestoGtimeListResponseDto } from './dto/manifiesto-gtime-list-response.dto';
 
 @ApiTags('manifiestos')
 @ApiBearerAuth()
@@ -50,7 +52,7 @@ export class ManifiestoController {
   @ApiResponse({
     status: 200,
     description: 'Lista de manifiestos GTIME encontrados. Cada manifiesto contiene información básica como número, fecha, estado, transportista, etc.',
-    type: [ManifiestoGtimeResponseDto]
+    type: ManifiestoGtimeListResponseDto
   })
   @ApiResponse({
     status: 400,
@@ -64,8 +66,6 @@ export class ManifiestoController {
     try {
       console.log('🔍 Consulta recibida:', consultaDto);
 
-      // LÓGICA CONDICIONAL: Si hay número de manifiesto, usar consultaMftocGTIME (existente)
-      // Si NO hay número de manifiesto, usar consultaMFTOC (nuevo)
       let result;
       if (consultaDto.EdNroManifiesto && consultaDto.EdNroManifiesto.trim() !== '') {
         console.log('📋 Búsqueda por número de manifiesto específico - usando consultaMftocGTIME');
@@ -76,7 +76,11 @@ export class ManifiestoController {
       }
 
       console.log('✅ Resultado obtenido:', result.length, 'registros');
-      return result;
+
+      return {
+        manifiestos: result,
+        rowsCount: result.length
+      };
     } catch (error) {
       console.error('❌ Error en consultaGtime:', error);
       throw error;
@@ -97,7 +101,7 @@ export class ManifiestoController {
   @ApiResponse({
     status: 200,
     description: 'Lista de guías GTIME asociadas al manifiesto. Cada guía contiene detalles como número de documento, emisor, consignatario, productos, peso, valor declarado, etc.',
-    type: [GuiaManifiestoResponseDto]
+    type: GuiasManifiestoListResponseDto
   })
   @ApiResponse({
     status: 400,
@@ -112,7 +116,11 @@ export class ManifiestoController {
       console.log('🔍 Consulta guías por manifiesto:', consultaDto);
       const result = await this.manifiestoService.consultaGuiasPorManifiesto(consultaDto);
       console.log('✅ Guías encontradas:', result.length, 'registros');
-      return result;
+
+      return {
+        guias: result,
+        rowsCount: result.length
+      };
     } catch (error) {
       console.error('❌ Error en consultaGuiasPorManifiesto:', error);
       throw error;

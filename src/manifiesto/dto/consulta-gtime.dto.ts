@@ -24,8 +24,8 @@ export class ConsultaGtimeDto {
   @IsString()
   EdFechaTermino?: string;
 
-  @ApiPropertyOptional({ 
-    description: 'Estado del visado', 
+  @ApiPropertyOptional({
+    description: 'Estado del visado',
     example: 'PEND',
     enum: ['PEND', 'SI', 'NCMP', 'TODOS']
   })
@@ -33,8 +33,8 @@ export class ConsultaGtimeDto {
   @IsString()
   EdVisado?: string;
 
-  @ApiPropertyOptional({ 
-    description: 'Tipo de courier', 
+  @ApiPropertyOptional({
+    description: 'Tipo de courier',
     example: 'TODOS',
     enum: ['CN', 'CT', 'TODOS', 'EXTERNO']
   })
