@@ -54,7 +54,9 @@ export class ManifiestoService {
   async consultaGuiasPorManifiesto(consultaDto: ConsultaGuiasManifiestoDto) {
     const guias = await this.oracleService.consultaGuiasPorManifiesto(
       consultaDto.numeroManifiesto,
-      consultaDto.nroGuia
+      consultaDto.nroGuia,
+      consultaDto.pagina,
+      consultaDto.porPagina
     );
 
     // Aplicar clasificación fiscal a cada guía

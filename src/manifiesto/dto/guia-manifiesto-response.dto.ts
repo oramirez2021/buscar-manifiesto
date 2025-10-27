@@ -31,37 +31,37 @@ export class GuiaManifiestoResponseDto {
     @ApiProperty({ description: 'Valor declarado en USD', example: 150.00 })
     TotalValor: number;
 
-    @ApiProperty({ description: 'Consignante', example: 'Empresa Exportadora S.A.' })
+    @ApiProperty({ description: 'Nombre del consignante (quien envía la mercancía)', example: 'Empresa Exportadora S.A.' })
     Consignante: string;
 
-    @ApiProperty({ description: 'Consignatario', example: 'Juan Pérez' })
+    @ApiProperty({ description: 'Nombre del consignatario (destinatario de la mercancía)', example: 'Juan Pérez' })
     Consignatario: string;
 
-    @ApiProperty({ description: 'RUT consignatario', example: '12345678-9' })
+    @ApiProperty({ description: 'RUT del consignatario en formato chileno', example: '12345678-9' })
     rutconsignatario: string;
 
-    @ApiProperty({ description: 'Productos', example: 'Ropa, Electrónicos' })
+    @ApiProperty({ description: 'Descripción de los productos contenidos en la guía', example: 'Ropa, Electrónicos' })
     Productos: string;
 
-    @ApiProperty({ description: 'Marcas del documento - representa id envio', example: 'Marca1, Marca2' })
+    @ApiProperty({ description: 'Marcas del documento - representa IDs de envíos asociados', example: 'Marca1, Marca2' })
     marcas: string;
 
-    @ApiProperty({ description: 'Vistos buenos', example: 'SI/NO' })
+    @ApiProperty({ description: 'Indica si la guía tiene vistos buenos aprobados', example: 'SI', enum: ['SI', 'NO'] })
     VistosBuenos: string;
 
-    @ApiProperty({ description: 'Es tránsito', example: 'SI/NO' })
+    @ApiProperty({ description: 'Indica si la guía es de tránsito', example: 'NO', enum: ['SI', 'NO'] })
     Transito: string;
 
     @ApiProperty({ description: 'Fecha de creación (fechaactiva del query)', example: '2024-01-15 10:30:00' })
     FechaCreacion: string;
 
-    @ApiProperty({ description: 'Estado actual', example: 'ACTIVO' })
+    @ApiProperty({ description: 'Estado actual del documento en el sistema', example: 'ACTIVO' })
     EstadoActual: string;
 
-    @ApiProperty({ description: 'Detalle', example: 'Más Info.' })
+    @ApiProperty({ description: 'Detalle del documento para mostrar más información', example: 'Más Info.' })
     Detalle: string;
 
-    @ApiProperty({ description: 'HTML para ver PDF' })
+    @ApiProperty({ description: 'HTML generado para visualizar el PDF del documento' })
     verPDF: string;
 
     @ApiProperty({ description: 'Número de documento (duplicado)', example: 'GTIME-IVAD-08092025025' })
@@ -76,19 +76,19 @@ export class GuiaManifiestoResponseDto {
     @ApiProperty({ description: 'Cantidad de denuncias (cant_denuncias del query)', example: 0 })
     cantidadDenuncias: number;
 
-    @ApiProperty({ description: 'Transbordos', example: 'Transbordo aéreo' })
+    @ApiProperty({ description: 'Información sobre transbordos realizados', example: 'Transbordo aéreo' })
     Transbordos: string;
 
-    @ApiProperty({ description: 'Motivo de selección', example: 'Alto valor' })
+    @ApiProperty({ description: 'Motivo por el cual fue seleccionada para fiscalización', example: 'Alto valor' })
     MotivoSeleccion: string;
 
-    @ApiProperty({ description: 'Tipo RUT consignatario', example: 'rutEmbajada' })
+    @ApiProperty({ description: 'Tipo de RUT del consignatario (rutBuzon, rutEmbajada, rutEmpresa, etc.)', example: 'rutEmbajada', enum: ['rutBuzon', 'rutEmbajada', 'rutEmpresa', ''] })
     tipoRutConsignatario: string;
 
-    @ApiProperty({ description: 'Observación IVA-COB', example: 'Observación de IVA' })
+    @ApiProperty({ description: 'Observación relacionada con IVA-COB', example: 'Observación de IVA' })
     ivacob: string;
 
-    @ApiProperty({ description: 'Clasificación fiscal con colores HTML + propuesta', example: '<span class="color-box verde" title="LIBRE"></span>LIBRE' })
+    @ApiProperty({ description: 'Clasificación fiscal con colores HTML y propuesta de decisión', example: '<span class="color-box verde" title="LIBRE"></span>LIBRE' })
     propuesta: string;
 
     @ApiPropertyOptional({ description: 'Datos PDF en formato JSON', example: {} })

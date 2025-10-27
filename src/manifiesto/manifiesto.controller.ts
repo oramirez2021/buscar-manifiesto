@@ -4,7 +4,12 @@ import {
   Query,
   Post,
   Body,
-  Res
+  Res,
+  HttpException,
+  HttpStatus,
+  BadRequestException,
+  InternalServerErrorException,
+  Logger
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -28,6 +33,8 @@ import { ManifiestoGtimeListResponseDto } from './dto/manifiesto-gtime-list-resp
 @ApiBearerAuth()
 @Controller('manifiestos')
 export class ManifiestoController {
+  private readonly logger = new Logger(ManifiestoController.name);
+
   constructor(
     private readonly manifiestoService: ManifiestoService,
     private readonly pdfGeneratorService: PdfGeneratorService
@@ -36,7 +43,17 @@ export class ManifiestoController {
   @Public()
   @Get('health')
   @ApiOperation({ summary: 'Health check endpoint' })
-  @ApiResponse({ status: 200, description: 'Service is healthy.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Service is healthy.',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Manifiesto Service is running' },
+        status: { type: 'string', example: 'ok' }
+      }
+    }
+  })
   healthCheck() {
     return { message: 'Manifiesto Service is running', status: 'ok' };
   }
@@ -47,7 +64,7 @@ export class ManifiestoController {
   @Get('consulta-gtime')
   @ApiOperation({
     summary: 'Consulta manifiestos GTIME desde Oracle',
-    description: 'Endpoint que consulta manifiestos GTIME desde la base de datos Oracle. Si se proporciona un número de manifiesto específico, usa consultaMftocGTIME. Si no, usa consultaMFTOC con filtros de fecha. Devuelve información básica de manifiestos (no guías individuales).'
+    description: 'Endpoint que consulta manifiestos GTIME desde la base de datos Oracle. Si se proporciona un número de manifiesto específico, usa consultaMftocGTIME. Si no, usa consultaMFTOC con filtros de fecha. Devuelve información básica de manifiestos (no guías individuales). Soporta paginación con parámetros `pagina` y `porPagina`.'
   })
   @ApiResponse({
     status: 200,
@@ -64,26 +81,53 @@ export class ManifiestoController {
   })
   async consultaGtime(@Query() consultaDto: ConsultaGtimeDto) {
     try {
-      console.log('🔍 Consulta recibida:', consultaDto);
+      this.logger.log(`🔍 Consulta recibida - Parámetros: ${JSON.stringify(consultaDto)}`);
 
       let result;
       if (consultaDto.EdNroManifiesto && consultaDto.EdNroManifiesto.trim() !== '') {
-        console.log('📋 Búsqueda por número de manifiesto específico - usando consultaMftocGTIME');
+        this.logger.log('📋 Búsqueda por número de manifiesto específico - usando consultaMftocGTIME');
         result = await this.manifiestoService.consultaMftocGTIME(consultaDto);
       } else {
-        console.log('📅 Búsqueda por fechas - usando consultaMFTOC');
+        this.logger.log('📅 Búsqueda por fechas - usando consultaMFTOC');
         result = await this.manifiestoService.consultaMFTOC(consultaDto);
       }
 
-      console.log('✅ Resultado obtenido:', result.length, 'registros');
+      this.logger.log(`✅ Resultado obtenido: ${result.length} registros`);
 
       return {
         manifiestos: result,
         rowsCount: result.length
       };
     } catch (error) {
-      console.error('❌ Error en consultaGtime:', error);
-      throw error;
+      this.logger.error(`❌ Error en consultaGtime: ${error.message}`, error.stack);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      if (error.message?.includes('not all variables bound') ||
+        error.message?.includes('ORA-01008')) {
+        throw new InternalServerErrorException({
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: 'Error en la consulta a Oracle: Variables no definidas correctamente',
+          error: 'Database Query Error'
+        });
+      }
+
+      if (error.message?.includes('connection') ||
+        error.message?.includes('timeout')) {
+        throw new InternalServerErrorException({
+          statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+          message: 'Error de conexión con la base de datos Oracle',
+          error: 'Database Connection Error'
+        });
+      }
+
+      throw new InternalServerErrorException({
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Error interno al consultar manifiestos GTIME',
+        error: 'Internal Server Error'
+      });
     }
   }
 
@@ -96,7 +140,7 @@ export class ManifiestoController {
   @Get('guias-por-manifiesto')
   @ApiOperation({
     summary: 'Consulta guías asociadas a un manifiesto específico',
-    description: 'Replica la funcionalidad de MDetalleDocumento.jsp para obtener guías GTIME asociadas a un manifiesto. Devuelve información detallada de cada guía individual (no información del manifiesto).'
+    description: 'Replica la funcionalidad de MDetalleDocumento.jsp para obtener guías GTIME asociadas a un manifiesto. Devuelve información detallada de cada guía individual (no información del manifiesto). Permite filtrar por número de guía específica. Soporta paginación con parámetros `pagina` y `porPagina`.'
   })
   @ApiResponse({
     status: 200,
@@ -113,17 +157,53 @@ export class ManifiestoController {
   })
   async consultaGuiasPorManifiesto(@Query() consultaDto: ConsultaGuiasManifiestoDto) {
     try {
-      console.log('🔍 Consulta guías por manifiesto:', consultaDto);
+      this.logger.log(`🔍 Consulta guías por manifiesto - Parámetros: ${JSON.stringify(consultaDto)}`);
+
+      if (!consultaDto.numeroManifiesto || consultaDto.numeroManifiesto <= 0) {
+        throw new BadRequestException({
+          statusCode: HttpStatus.BAD_REQUEST,
+          message: 'El número de manifiesto es requerido y debe ser mayor a 0',
+          error: 'Bad Request'
+        });
+      }
+
       const result = await this.manifiestoService.consultaGuiasPorManifiesto(consultaDto);
-      console.log('✅ Guías encontradas:', result.length, 'registros');
+      this.logger.log(`✅ Guías encontradas: ${result.length} registros`);
 
       return {
         guias: result,
         rowsCount: result.length
       };
     } catch (error) {
-      console.error('❌ Error en consultaGuiasPorManifiesto:', error);
-      throw error;
+      this.logger.error(`❌ Error en consultaGuiasPorManifiesto: ${error.message}`, error.stack);
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      if (error.message?.includes('not all variables bound') ||
+        error.message?.includes('ORA-01008')) {
+        throw new InternalServerErrorException({
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: 'Error en la consulta a Oracle: Variables no definidas correctamente',
+          error: 'Database Query Error'
+        });
+      }
+
+      if (error.message?.includes('connection') ||
+        error.message?.includes('timeout')) {
+        throw new InternalServerErrorException({
+          statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+          message: 'Error de conexión con la base de datos Oracle',
+          error: 'Database Connection Error'
+        });
+      }
+
+      throw new InternalServerErrorException({
+        statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: 'Error interno al consultar guías por manifiesto',
+        error: 'Internal Server Error'
+      });
     }
   }
 
