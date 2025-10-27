@@ -89,54 +89,6 @@ export class ManifiestoController {
 
 
   @Public()
-  @Get('marcas')
-  @ApiOperation({
-    summary: 'Obtener marcas de un documento GTIME',
-    description: 'Endpoint que obtiene las marcas asociadas a un documento GTIME específico usando la función Oracle gtime_getmarcasasstring.'
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Marcas obtenidas exitosamente.',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-        idgtime: { type: 'number', example: 12345 },
-        marcas: { type: 'string', example: 'Marca1, Marca2, Marca3' }
-      }
-    }
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Parámetro idgtime inválido o faltante.'
-  })
-  @ApiResponse({
-    status: 500,
-    description: 'Error interno del servidor al consultar Oracle.'
-  })
-  async getMarcas(@Query('idgtime') idgtime: string) {
-    try {
-      const idgtimeNumber = parseInt(idgtime);
-      if (isNaN(idgtimeNumber)) {
-        return { success: false, error: 'idgtime debe ser un número válido' };
-      }
-
-      console.log(`🔍 Obteniendo marcas para idgtime: ${idgtimeNumber}`);
-      const marcas = await this.manifiestoService.gtimeGetMarcasAsString(idgtimeNumber);
-      console.log('✅ Marcas obtenidas exitosamente');
-
-      return {
-        success: true,
-        idgtime: idgtimeNumber,
-        marcas: marcas
-      };
-    } catch (error) {
-      console.error('❌ Error en getMarcas:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  @Public()
   @Get('guias-por-manifiesto')
   @ApiOperation({
     summary: 'Consulta guías asociadas a un manifiesto específico',
@@ -167,7 +119,7 @@ export class ManifiestoController {
     }
   }
 
-  @Post('test-pdf')
+  // @Post('test-pdf')
   async testPdf(@Res() res: Response): Promise<void> {
     try {
       const xml = `<?xml version="1.0" encoding="ISO-8859-1" ?>
