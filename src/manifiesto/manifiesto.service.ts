@@ -1,9 +1,6 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
-import { CreateManifiestoDto } from './dto/create-manifiesto.dto';
-import { UpdateManifiestoDto } from './dto/update-manifiesto.dto';
-import { BuscarManifiestoDto } from './dto/buscar-manifiesto.dto';
+import { Repository } from 'typeorm';
 import { ConsultaGtimeDto } from './dto/consulta-gtime.dto';
 import { ConsultaGuiasManifiestoDto } from './dto/consulta-guias-manifiesto.dto';
 import { OracleService } from './oracle.service';
