@@ -42,7 +42,9 @@ export class ManifiestoService {
       consultaDto.EdNroManifiesto,
       consultaDto.guiaCourier,
       consultaDto.EdNombrePersona,
-      consultaDto.MRevisionMFTOC_pageCode
+      consultaDto.MRevisionMFTOC_pageCode,
+      consultaDto.pagina,
+      consultaDto.porPagina
     );
   }
 

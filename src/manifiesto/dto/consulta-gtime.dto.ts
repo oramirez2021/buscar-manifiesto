@@ -61,4 +61,29 @@ export class ConsultaGtimeDto {
   @IsOptional()
   @IsString()
   MRevisionMFTOC_pageCode?: string;
+
+  @ApiPropertyOptional({ description: 'Número de página', example: 1 })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === null || value === undefined) return undefined;
+    const num = Number(value);
+    return isNaN(num) ? undefined : num;
+  })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'pagina debe ser un número' })
+  @Min(1, { message: 'pagina debe ser al menos 1' })
+  pagina?: number;
+
+  @ApiPropertyOptional({ description: 'Registros por página', example: 10 })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === null || value === undefined) return undefined;
+    const num = Number(value);
+    return isNaN(num) ? undefined : num;
+  })
+  @Type(() => Number)
+  @IsNumber({}, { message: 'porPagina debe ser un número' })
+  @Min(1, { message: 'porPagina debe ser al menos 1' })
+  @Max(100, { message: 'porPagina no puede exceder 100' })
+  porPagina?: number;
 }

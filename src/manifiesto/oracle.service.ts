@@ -765,7 +765,9 @@ export class OracleService {
     nroManifiesto?: string,
     nroGuia?: string,
     nombrePersona?: string,
-    pageCode?: string
+    pageCode?: string,
+    pagina?: number,
+    porPagina?: number
   ) {
     try {
       this.logger.log('🔍 Usando consulta MFTOC equivalente a ConsultaMFTOC del Java');
@@ -795,7 +797,12 @@ export class OracleService {
         fechaInicio,
         fechaTermino,
         nroManifiesto,
-        emisor
+        emisor,
+        nroGuia,
+        visado,
+        tipoCourier,
+        pagina,
+        porPagina
       );
 
       this.logger.log(`📊 Registros obtenidos de Oracle: ${result.length}`);
@@ -850,7 +857,9 @@ export class OracleService {
     idEmisor?: number,
     nroGuia?: string,
     visado?: string,
-    tipoCourier?: string
+    tipoCourier?: string,
+    pagina?: number,
+    porPagina?: number
   ) {
 
     let connection;
@@ -864,8 +873,8 @@ export class OracleService {
 
       // Query equivalente a Fisc_ConsultaMFTOC sin XMLTYPE
       const query = `
-      --SELECT * FROM (
-      --SELECT a.*, ROWNUM rnum FROM (
+      SELECT * FROM (
+      SELECT a.*, ROWNUM rnum FROM (
         SELECT MFTOC.id,
            MFTOC.numeroexterno,
            MFTOC.emisor,
@@ -1030,8 +1039,8 @@ export class OracleService {
      WHERE (NVL(:nroManifiesto, '0') = '0' OR MFTOC.numeroexterno = :nroManifiesto)
        AND (NVL(:idEmisor, 0) = 0 OR MFTOC.idemisor = :idEmisor)
      ORDER BY MFTOC.numeroexterno
-  --) a WHERE ROWNUM <= :pagina * :porPagina
---) WHERE rnum > (:pagina - 1) * :porPagina
+  ) a WHERE ROWNUM <= :pagina * :porPagina
+) WHERE rnum > (:pagina - 1) * :porPagina
       `;
 
       this.logger.log(`📝 Ejecutando query completa equivalente a Fisc_ConsultaMFTOC`);
@@ -1040,7 +1049,9 @@ export class OracleService {
         nroManifiesto: nroManifiesto || '0',
         idEmisor: idEmisor || 0,
         fechaDesde: v_fechadesde,
-        fechaHasta: v_fechahasta
+        fechaHasta: v_fechahasta,
+        pagina: pagina || 1,
+        porPagina: porPagina || 10
       });
 
       const processedRows = [];
