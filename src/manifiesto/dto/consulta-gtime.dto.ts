@@ -14,7 +14,10 @@ export class ConsultaGtimeDto {
   @Min(1, { message: 'EdIdPersona must be at least 1' })
   EdIdPersona?: number;
 
-  @ApiPropertyOptional({ description: 'Fecha desde para filtrar', example: '01/10/2025' })
+  @ApiPropertyOptional({
+    description: 'Fecha desde para filtrar (obligatoria si EdNroManifiesto está vacío)',
+    example: '01/10/2025'
+  })
   @IsOptional()
   @IsString()
   @Matches(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/, {
@@ -22,7 +25,10 @@ export class ConsultaGtimeDto {
   })
   EdFechaInicio?: string;
 
-  @ApiPropertyOptional({ description: 'Fecha hasta para filtrar', example: '22/10/2025' })
+  @ApiPropertyOptional({
+    description: 'Fecha hasta para filtrar (obligatoria si EdNroManifiesto está vacío)',
+    example: '22/10/2025'
+  })
   @IsOptional()
   @IsString()
   @Matches(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/, {
@@ -48,7 +54,10 @@ export class ConsultaGtimeDto {
   @IsString()
   EdTipoViaTransporte?: string;
 
-  @ApiPropertyOptional({ description: 'Número del manifiesto', example: 'MAN-2024-001' })
+  @ApiPropertyOptional({
+    description: 'Número del manifiesto (opcional). Si se proporciona, devuelve solo ese manifiesto o ninguno si no existe. Si se deja vacío, se busca por fechas.',
+    example: 'MAN-2024-001'
+  })
   @IsOptional()
   @IsString()
   EdNroManifiesto?: string;

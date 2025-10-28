@@ -755,7 +755,10 @@ export class OracleService {
       }
     }
   }
-  //consulta manifiestos por fechas desde y hasta
+  /**
+   * Consulta manifiestos por fechas desde y hasta
+   * nroManifiesto opcional: null/undefined = búsqueda por fechas, valor = manifiesto específico
+   */
   async consultaMFTOC(
     emisor?: number,
     fechaInicio?: string,
@@ -849,7 +852,7 @@ export class OracleService {
       throw error;
     }
   }
-
+  //consulta manifiestos por fechas desde y hasta
   async consultaMFTOCCompleta(
     fechaDesde?: string,
     fechaHasta?: string,
@@ -1046,7 +1049,7 @@ export class OracleService {
       this.logger.log(`📝 Ejecutando query completa equivalente a Fisc_ConsultaMFTOC`);
 
       const result = await connection.execute(query, {
-        nroManifiesto: nroManifiesto || '0',
+        nroManifiesto: null,
         idEmisor: idEmisor || 0,
         fechaDesde: v_fechadesde,
         fechaHasta: v_fechahasta,
@@ -1283,9 +1286,9 @@ export class OracleService {
              WHERE DE.DOCUMENTO = docbase.ID
                AND DE.TIPOESTADO = 'ANU'
                AND DE.ACTIVA = 'S')
-       AND dtran.valordeclarado <= 41.0
-       AND esrevisado = 'NO'
-       AND esmarcado = 'NO'
+       AND dtran.valordeclarado <= 41.0 -- INCLUIDO EN EL QUERY 28-10-2025
+       AND esrevisado = 'NO' -- INCLUIDO EN EL QUERY 28-10-2025
+       AND esmarcado = 'NO' -- INCLUIDO EN EL QUERY 28-10-2025
      ORDER BY CASE
                 WHEN dp.RUTconsignatario = '99999999-9' THEN
                  1
