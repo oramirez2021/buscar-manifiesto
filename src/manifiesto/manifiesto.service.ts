@@ -17,7 +17,7 @@ export class ManifiestoService {
     private readonly clasificadorGuiasService: ClasificadorGuiasService,
   ) { }
 
-
+  // consulta de manifiestos por numero de manifiesto específico
   async consultaMftocGTIME(consultaDto: ConsultaGtimeDto) {
     return await this.oracleService.consultaMftocGTIME(
       consultaDto.EdIdPersona,
@@ -31,7 +31,7 @@ export class ManifiestoService {
       consultaDto.MRevisionMFTOC_pageCode
     );
   }
-
+  // consulta de manifiestos por fechas desde y hasta
   async consultaMFTOC(consultaDto: ConsultaGtimeDto) {
     return await this.oracleService.consultaMFTOC(
       consultaDto.EdIdPersona,
@@ -50,7 +50,7 @@ export class ManifiestoService {
 
 
 
-
+  //consulta guiasa por manifiesto
   async consultaGuiasPorManifiesto(consultaDto: ConsultaGuiasManifiestoDto) {
     const guias = await this.oracleService.consultaGuiasPorManifiesto(
       consultaDto.numeroManifiesto,

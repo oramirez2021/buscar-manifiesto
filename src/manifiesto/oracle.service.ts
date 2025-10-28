@@ -147,7 +147,7 @@ export class OracleService {
       throw new Error(`Database connection failed: ${error.message}`);
     }
   }
-
+  // consulta de manifiesto por numero de manifiesto específico
   async consultaMftocGTIME(
     emisor?: number,
     fechaInicio?: string,
@@ -166,77 +166,50 @@ export class OracleService {
       this.logger.log(`📊 Registros obtenidos de Oracle: ${result.length}`);
 
       // Si hay número de manifiesto específico, devolver directamente sin filtros adicionales
-      if (nroManifiesto && nroManifiesto.trim() !== '') {
+      //if (nroManifiesto && nroManifiesto.trim() !== '') {
 
-        // Usar el nuevo método completo que replica la función del PKB
-        result = await this.consultaMftocGTIMECompleta(
-          fechaInicio,
-          fechaTermino,
-          nroManifiesto,
-          emisor,
-          nroGuia,
-          visado,
-          tipoCourier,
-          nombrePersona,
-          pageCode
+      // Usar el nuevo método completo que replica la función del PKB
+      result = await this.consultaMftocGTIMECompleta(
+        fechaInicio,
+        fechaTermino,
+        nroManifiesto,
+        emisor,
+        nroGuia,
+        visado,
+        tipoCourier,
+        nombrePersona,
+        pageCode
+      );
+
+      const processedRows = [];
+
+      // Solo aplicar filtros cuando se busca por fechas
+
+      for (const row of result) {
+        const estaConformado = this.nvl((row as any).esConformado || 'NO');
+        const estaVisado = this.nvl((row as any).esVisado || 'PEND');
+        const madrereferenciada = (row as any).madrereferenciada;
+        const micreferenciado = (row as any).micreferenciado;
+        const crtreferenciado = (row as any).crtreferenciado;
+
+        // Aplicar filtros según el tipo de courier
+        //  if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
+        //  (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
+        //continue;
+        //}
+
+        // Aplicar filtros según el estado de visado
+        // if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
+        // (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
+        // (estaVisado === VISADO_SI && visado === VISADO_SI) ||
+        // visado === TODOS_VISADO) {
+
+        const processedRow = this.mapConsultaMFTOCDirect(
+          row
         );
+        filteredRows.push(processedRow);
+        //    }
 
-        const processedRows = [];
-
-        for (const row of result) {
-          const processedRow = this.mapConsultaMFTOCDirect(
-            row
-          );
-          const estaConformado = this.nvl((row as any).ESCONFORMADO || 'NO');
-          const estaVisado = this.nvl((row as any).ESVISADO || 'PEND');
-          const madrereferenciada = (row as any).MADREREFERENCIADA;
-          const micreferenciado = (row as any).MICREFERENCIADO;
-          const crtreferenciado = (row as any).CRTREFERENCIADO;
-
-          // Aplicar filtros según el tipo de courier
-          if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
-            (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
-            continue;
-          }
-          // Aplicar filtros según el estado de visado
-          if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
-            (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
-            (estaVisado === VISADO_SI && visado === VISADO_SI) ||
-            visado === TODOS_VISADO) {
-            processedRows.push(processedRow);
-          }
-        }
-
-        this.logger.log(`✅ Procesamiento directo completado: ${processedRows.length} registros finales`);
-        return processedRows;
-      } else {
-        // Solo aplicar filtros cuando se busca por fechas
-
-        for (const row of result) {
-          const estaConformado = this.nvl((row as any).esConformado || 'NO');
-          const estaVisado = this.nvl((row as any).esVisado || 'PEND');
-          const madrereferenciada = (row as any).madrereferenciada;
-          const micreferenciado = (row as any).micreferenciado;
-          const crtreferenciado = (row as any).crtreferenciado;
-
-          // Aplicar filtros según el tipo de courier
-          if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
-            (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
-            continue;
-          }
-
-          // Aplicar filtros según el estado de visado
-          if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
-            (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
-            (estaVisado === VISADO_SI && visado === VISADO_SI) ||
-            visado === TODOS_VISADO) {
-
-            const processedRow = this.mapConsultaMFTOCDirect(
-              row
-            );
-            filteredRows.push(processedRow);
-          }
-        }
       }
 
       this.logger.log(`✅ Filtrado completado: ${filteredRows.length} registros finales`);
@@ -507,7 +480,7 @@ export class OracleService {
     `;
   }
 
-
+  //con numero de manifiesto específico
   async consultaMftocGTIMECompleta(
     fechaDesde?: string,
     fechaHasta?: string,
@@ -701,6 +674,15 @@ export class OracleService {
         WHERE (NVL(:nroManifiesto, '0') = '0' OR MFTOC.numeroexterno = :nroManifiesto)
           AND (NVL(:idEmisor, 0) = 0 OR MFTOC.idemisor = :idEmisor)
           AND (:nroGuia IS NULL OR MFTOC.existeGuia > 0)
+          --se aniade para filtros adicionales 28-10-2025
+                    AND NOT (:tipoCourier = 'CN' AND EXTRACTVALUE(XMLTYPE(DI.xml), '//Referencias/referencia[tipo-documento=''MIC'']/numero/text()') IS NOT NULL)
+          AND NOT (:tipoCourier = 'CT' AND EXTRACTVALUE(XMLTYPE(DI.xml), '//Referencias/referencia[tipo-documento=''GA'']/numero/text()') IS NOT NULL)
+          AND (
+            :visado = 'TODOS'
+            OR (:visado = 'NCMP' AND MFTOC.esConformado != 'SI')
+            OR (:visado = 'PEND' AND MFTOC.esConformado = 'SI' AND NOT EXISTS (SELECT 1 FROM DOCUMENTOS.docestados WHERE documento = MFTOC.id AND TIPODOCUMENTO = 'MFTOC' AND tipoestado = 'VIS'))
+            OR (:visado = 'SI' AND EXISTS (SELECT 1 FROM DOCUMENTOS.docestados WHERE documento = MFTOC.id AND TIPODOCUMENTO = 'MFTOC' AND tipoestado = 'VIS'))
+          )
         ORDER BY MFTOC.numeroexterno
       `;
       console.log("query: ", query);
@@ -718,7 +700,9 @@ export class OracleService {
         idEmisor: idEmisor || 0,
         nroGuia: nroGuia || null,
         fechaDesde: v_fechadesde,
-        fechaHasta: v_fechahasta
+        fechaHasta: v_fechahasta,
+        visado: visado || 'TODOS',        // ← FALTA
+        tipoCourier: tipoCourier || null  // ← FALTA
       });
 
       const processedRows = [];
@@ -820,28 +804,28 @@ export class OracleService {
         const micreferenciado = (row as any).MICREFERENCIADO;
         const crtreferenciado = (row as any).CRTREFERENCIADO;
 
-        // Aplicar filtros según el tipo de courier (líneas 163-166 del Java)
-        if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
-          (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
-          continue;
-        }
+        // Aplicar filtros según el tipo de courier (líneas 163-166 del Java) - FILTRADO AHORA EN SQL
+        // if ((tipoCourier === TIPO_COURIER_CN && micreferenciado) ||
+        //   (tipoCourier === TIPO_COURIER_CT && madrereferenciada)) {
+        //   continue;
+        // }
 
-        // Aplicar filtros según el estado de visado (líneas 168-174 del Java)
-        if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
-          (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
-          (estaVisado === VISADO_SI && visado === VISADO_SI) ||
-          visado === TODOS_VISADO) {
+        // Aplicar filtros según el estado de visado (líneas 168-174 del Java) - FILTRADO AHORA EN SQL
+        // if ((estaConformado !== CONFORMADO_SI && visado === NCMP_VISADO) ||
+        //   (estaConformado === CONFORMADO_SI && visado === PEND_VISADO && estaVisado !== VISADO_SI) ||
+        //   (estaVisado === VISADO_SI && visado === VISADO_SI) ||
+        //   visado === TODOS_VISADO) {
 
-          const processedRow = this.mapConsultaMFTOCFiltroDirect(
-            row,
-            estaVisado,
-            estaConformado,
-            madrereferenciada,
-            micreferenciado,
-            crtreferenciado
-          );
-          filteredRows.push(processedRow);
-        }
+        const processedRow = this.mapConsultaMFTOCFiltroDirect(
+          row,
+          estaVisado,
+          estaConformado,
+          madrereferenciada,
+          micreferenciado,
+          crtreferenciado
+        );
+        filteredRows.push(processedRow);
+        // }
       }
 
       this.logger.log(`✅ Filtrado completado: ${filteredRows.length} registros finales`);
@@ -1041,6 +1025,15 @@ export class OracleService {
         ON (DI.documento = MFTOC.id)
      WHERE (NVL(:nroManifiesto, '0') = '0' OR MFTOC.numeroexterno = :nroManifiesto)
        AND (NVL(:idEmisor, 0) = 0 OR MFTOC.idemisor = :idEmisor)
+       --se aniade para filtros adicionales 28-10-2025
+       AND NOT (:tipoCourier = 'CN' AND EXTRACTVALUE(XMLTYPE(DI.xml), '//Referencias/referencia[tipo-documento=''MIC'']/numero/text()') IS NOT NULL)
+       AND NOT (:tipoCourier = 'CT' AND EXTRACTVALUE(XMLTYPE(DI.xml), '//Referencias/referencia[tipo-documento=''GA'']/numero/text()') IS NOT NULL)
+       AND (
+         :visado = 'TODOS'
+         OR (:visado = 'NCMP' AND MFTOC.esConformado != 'SI')
+         OR (:visado = 'PEND' AND MFTOC.esConformado = 'SI' AND NOT EXISTS (SELECT 1 FROM DOCUMENTOS.docestados WHERE documento = MFTOC.id AND TIPODOCUMENTO = 'MFTOC' AND tipoestado = 'VIS'))
+         OR (:visado = 'SI' AND EXISTS (SELECT 1 FROM DOCUMENTOS.docestados WHERE documento = MFTOC.id AND TIPODOCUMENTO = 'MFTOC' AND tipoestado = 'VIS'))
+       )
      ORDER BY MFTOC.numeroexterno
   ) a WHERE ROWNUM <= :pagina * :porPagina
 ) WHERE rnum > (:pagina - 1) * :porPagina
@@ -1054,7 +1047,9 @@ export class OracleService {
         fechaDesde: v_fechadesde,
         fechaHasta: v_fechahasta,
         pagina: pagina || 1,
-        porPagina: porPagina || 10
+        porPagina: porPagina || 10,
+        visado: visado || 'TODOS',
+        tipoCourier: tipoCourier || null
       });
 
       const processedRows = [];
@@ -1085,7 +1080,7 @@ export class OracleService {
       }
     }
   }
-
+  // consulta las guias por numero de manifiesto
   async consultaGuiasPorManifiesto(
     //va a recibir el numero de manifiesto, el numero de guia, la pagina y la cantidad de registros por pagina
     //viene de la funcion qguiascourier_GTIMEv2 de dos parametros
