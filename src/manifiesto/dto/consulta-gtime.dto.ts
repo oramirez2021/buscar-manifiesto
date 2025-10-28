@@ -1,4 +1,4 @@
-import { IsString, IsDateString, IsOptional, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsDateString, IsOptional, IsNumber, Min, Max, Matches } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 
@@ -17,11 +17,17 @@ export class ConsultaGtimeDto {
   @ApiPropertyOptional({ description: 'Fecha desde para filtrar', example: '01/10/2025' })
   @IsOptional()
   @IsString()
+  @Matches(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/, {
+    message: 'EdFechaInicio debe tener formato DD/MM/YYYY o DD-MM-YYYY'
+  })
   EdFechaInicio?: string;
 
   @ApiPropertyOptional({ description: 'Fecha hasta para filtrar', example: '22/10/2025' })
   @IsOptional()
   @IsString()
+  @Matches(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/, {
+    message: 'EdFechaTermino debe tener formato DD/MM/YYYY o DD-MM-YYYY'
+  })
   EdFechaTermino?: string;
 
   @ApiPropertyOptional({

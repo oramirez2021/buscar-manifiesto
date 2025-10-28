@@ -755,7 +755,7 @@ export class OracleService {
       }
     }
   }
-
+  //consulta manifiestos por fechas desde y hasta
   async consultaMFTOC(
     emisor?: number,
     fechaInicio?: string,
@@ -1283,6 +1283,9 @@ export class OracleService {
              WHERE DE.DOCUMENTO = docbase.ID
                AND DE.TIPOESTADO = 'ANU'
                AND DE.ACTIVA = 'S')
+       AND dtran.valordeclarado <= 41.0
+       AND esrevisado = 'NO'
+       AND esmarcado = 'NO'
      ORDER BY CASE
                 WHEN dp.RUTconsignatario = '99999999-9' THEN
                  1
@@ -1326,20 +1329,20 @@ export class OracleService {
     const topeMaximo_Fiscalizable = 41.0; // Línea 36 del DAO original
 
     const filteredRows = rows.filter(row => {
-      // Extraer valores para filtros (líneas 552-558 del DAO original)
-      const valorDeclarado = Number(this.nvl(row[28])); // valordeclarado
-      const esRevisado = this.nvl(row[14]); // esrevisado ('SI' o 'NO')
-      const esMarcado = this.nvl(row[15]);  // esmarcado ('SI' o 'NO')
+      // Extraer valores para filtros (líneas 552-558 del DAO original) -- INCLUIDO EN EL QUERY 28-10-2025
+      //const valorDeclarado = Number(this.nvl(row[28])); // valordeclarado
+      //const esRevisado = this.nvl(row[14]); // esrevisado ('SI' o 'NO')
+      //const esMarcado = this.nvl(row[15]);  // esmarcado ('SI' o 'NO')
 
-      // FILTRO 1: Excluir si valorDeclarado > 41.0 (línea 552-554)
-      if (valorDeclarado > topeMaximo_Fiscalizable) {
-        return false;
-      }
+      // FILTRO 1: Excluir si valorDeclarado > 41.0 (línea 552-554) -- INCLUIDO EN EL QUERY 28-10-2025
+      //if (valorDeclarado > topeMaximo_Fiscalizable) {
+      //return false;
+      //}
 
-      // FILTRO 2: Excluir si esRevisado = 'SI' o esMarcado = 'SI' (línea 556-558)
-      if (esRevisado === 'SI' || esMarcado === 'SI') {
-        return false;
-      }
+      // FILTRO 2: Excluir si esRevisado = 'SI' o esMarcado = 'SI' (línea 556-558) -- INCLUIDO EN EL QUERY 28-10-2025
+      //if (esRevisado === 'SI' || esMarcado === 'SI') {
+      //return false;
+      //}
 
       return true;
     });
