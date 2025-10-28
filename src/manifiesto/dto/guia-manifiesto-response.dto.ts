@@ -16,8 +16,11 @@ export class GuiaManifiestoResponseDto {
     @ApiProperty({ description: 'Identificador del documento', type: OidDto })
     Oid: OidDto;
 
-    @ApiProperty({ description: 'Número de documento', example: 'GTIME-IVAD-08092025025' })
-    NumeroDoc: string;
+    @ApiProperty({ description: 'ID del documento en docdocumentobase', example: 12345678 })
+    idDocumento: number;
+
+    @ApiProperty({ description: 'Número de documento (NumeroDoc en el monolito)', example: 'GTIME-IVAD-08092025025' })
+    nroGuia: string;
 
     @ApiProperty({ description: 'Nombre del emisor', example: 'DHL Express' })
     NombreEmisor: string;

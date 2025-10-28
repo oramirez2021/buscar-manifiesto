@@ -1354,7 +1354,8 @@ export class OracleService {
         Oid: {
           Id: row[2]
         },
-        NumeroDoc: this.nvl(row[6]),
+        idDocumento: Number(row[10]),
+        nroGuia: this.nvl(row[6]),
         NombreEmisor: this.nvl(row[8]),
         TotalBultos: Number(this.nvl(row[26])),
         TotalPeso: Number(this.nvl(row[27])),
@@ -1371,7 +1372,7 @@ export class OracleService {
         Detalle: 'Ms Info.', // Exactamente como en el original
         verPDF: `<img src="/WebFiscalizaciones/resources/images/crobat3.jpg" style="cursor:pointer;" width="20" height="20" onclick="javascript:getPDF('${row[2]}','1','GTIME');return false;" >`,
         // Campos exactos del original WebFiscalizaciones
-        Numero: this.nvl(row[6]), // Duplicado de NumeroDoc
+        Numero: this.nvl(row[6]), // Duplicado de nroGuia
         TipoDoc: 'GUIA TIME',
         CodigoTipoDoc: this.nvl(row[7]), // tipoDocumento
         cantidadDenuncias: Number(this.nvl(row[34])), // cant_denuncias del query
